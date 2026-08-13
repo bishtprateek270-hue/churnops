@@ -1,0 +1,32 @@
+stages:
+  generate_data:
+    cmd: python data/generate_dataset.py
+    deps:
+      - data/generate_dataset.py
+    outs:
+      - data/raw/telco_churn.csv
+
+  validate:
+    cmd: python -c "import pandas as pd; from src.data_validation import validate_data; df=pd.read_csv('data/raw/telco_churn.csv'); validate_data(df)"
+    deps:
+      - data/raw/telco_churn.csv
+      - src/data_validation.py
+
+  train:
+    cmd: python src/train.py
+    deps:
+      - data/raw/telco_churn.csv
+      - src/data_validation.py
+      - src/preprocessing.py
+      - src/train.py
+    outs:
+      - models/preprocessor.joblib
+      - models/best_model.joblib
+      - data/processed/test_set.npz
+
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+      - data/processed/test_set.npz
+      - models/best_model.joblib
+      - src/evaluate.py

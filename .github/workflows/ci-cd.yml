@@ -1,0 +1,95 @@
+name: ChurnOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    name: Lint & Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Code Quality & Linting
+        run: |
+          ruff check .
+
+      - name: Run Unit Tests
+        run: |
+          pytest tests/ -v --tb=short
+
+  retrain-and-evaluate:
+    name: Model Retraining & Evaluation
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate Dataset & Run Retrain Pipeline
+        run: |
+          python data/generate_dataset.py
+          python pipelines/retrain_pipeline.py
+
+      - name: Archive MLflow Tracking Store
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-tracking-store
+          path: mlruns/
+
+  build-docker-image:
+    name: Build Docker Image
+    needs: retrain-and-evaluate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download MLflow Tracking Store
+        uses: actions/download-artifact@v4
+        with:
+          name: mlflow-tracking-store
+          path: mlruns/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: api/Dockerfile
+          push: false
+          tags: churnops-api:latest

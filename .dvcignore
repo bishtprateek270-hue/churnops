@@ -1,0 +1,11 @@
+# Add patterns of files dvc should ignore
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# MLflow and logs
+mlruns/
+mlflow.db
+*.log
+monitoring/predictions.db
