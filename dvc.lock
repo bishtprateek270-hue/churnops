@@ -1,0 +1,74 @@
+schema: '2.0'
+stages:
+  generate_data:
+    cmd: python data/generate_dataset.py
+    deps:
+    - path: data/generate_dataset.py
+      hash: md5
+      md5: 0357b03762a06d239aa2e3606a96f5d7
+      size: 4795
+    outs:
+    - path: data/raw/telco_churn.csv
+      hash: md5
+      md5: fa22d1affd6e5e45f5aa0eca5493375a
+      size: 977574
+  validate:
+    cmd: python -c "import pandas as pd; from src.data_validation import 
+      validate_data; df=pd.read_csv('data/raw/telco_churn.csv'); 
+      validate_data(df)"
+    deps:
+    - path: data/raw/telco_churn.csv
+      hash: md5
+      md5: fa22d1affd6e5e45f5aa0eca5493375a
+      size: 977574
+    - path: src/data_validation.py
+      hash: md5
+      md5: 0a19f42d48122509beee17f885241165
+      size: 5368
+  train:
+    cmd: python src/train.py
+    deps:
+    - path: data/raw/telco_churn.csv
+      hash: md5
+      md5: fa22d1affd6e5e45f5aa0eca5493375a
+      size: 977574
+    - path: src/data_validation.py
+      hash: md5
+      md5: 0a19f42d48122509beee17f885241165
+      size: 5368
+    - path: src/preprocessing.py
+      hash: md5
+      md5: b2982ca9696d5720896b00980281d8dd
+      size: 4332
+    - path: src/train.py
+      hash: md5
+      md5: e697f4b41b772eebdd3268eb236fc9f2
+      size: 7280
+    outs:
+    - path: data/processed/test_set.npz
+      hash: md5
+      md5: ba1b5f0d894e90c6140018fbbd1c7314
+      size: 389486
+    - path: models/best_model.joblib
+      hash: md5
+      md5: 7841f1d7c8e32f62fd2e989ed9562ee8
+      size: 1231
+    - path: models/preprocessor.joblib
+      hash: md5
+      md5: 63e77a03f6aaba831ed87bea9cb87a0b
+      size: 7444
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+    - path: data/processed/test_set.npz
+      hash: md5
+      md5: ba1b5f0d894e90c6140018fbbd1c7314
+      size: 389486
+    - path: models/best_model.joblib
+      hash: md5
+      md5: 7841f1d7c8e32f62fd2e989ed9562ee8
+      size: 1231
+    - path: src/evaluate.py
+      hash: md5
+      md5: a94ad83d5554f70bafc1c63bafae439d
+      size: 5307

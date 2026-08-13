@@ -3,6 +3,7 @@ Generates synthetic Telco Customer Churn dataset matching Kaggle standard schema
 """
 
 import os
+
 import numpy as np
 import pandas as pd
 

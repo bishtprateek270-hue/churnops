@@ -2,13 +2,20 @@
 Automated retraining and model promotion pipeline.
 """
 
-import sys
 import os
+import sys
+
+os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
+
+# Ensure workspace root directory is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import pandas as pd
 
 from data.generate_dataset import generate_telco_churn_data
 from src.data_validation import validate_data
-from src.train import train_and_evaluate
 from src.evaluate import compare_and_promote
+from src.train import train_and_evaluate
 
 
 def run_retraining_pipeline():
@@ -21,6 +28,13 @@ def run_retraining_pipeline():
         df = generate_telco_churn_data()
         os.makedirs("data/raw", exist_ok=True)
         df.to_csv(data_path, index=False)
+    else:
+        df = pd.read_csv(data_path)
+
+    # 1.5 Validate Data
+    print("Validating dataset...")
+    validate_data(df, is_training=True)
+    print("Data validation successful.")
 
     # 2. Train and register candidate model in Staging
     print("\n--- Training Candidate Models ---")

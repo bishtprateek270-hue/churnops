@@ -3,25 +3,36 @@ Training module for ChurnOps pipeline with MLflow tracking and Model Registry.
 """
 
 import os
-import tempfile
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import joblib
+import sys
 
+os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
+
+# Ensure workspace root directory is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import tempfile
+
+import joblib
+import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
-
-from sklearn.linear_model import LogisticRegression
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    roc_auc_score, confusion_matrix, roc_curve
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    roc_curve,
 )
+from sklearn.model_selection import train_test_split
+from xgboost import XGBClassifier
 
 from src.data_validation import validate_data
 from src.preprocessing import prepare_data, save_preprocessor
@@ -97,7 +108,7 @@ def train_and_evaluate(data_path: str = "data/raw/telco_churn.csv"):
 
     # 2. Preprocess data
     print("Preprocessing features...")
-    X, y, preprocessor, feature_names = prepare_data(df, fit=True)
+    X, y, preprocessor, _feature_names = prepare_data(df, fit=True)
     save_preprocessor(preprocessor, "models/preprocessor.joblib")
 
     # Split dataset: 70% train, 15% val, 15% test

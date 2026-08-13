@@ -2,13 +2,11 @@
 Data validation module for ChurnOps pipeline.
 """
 
-from typing import List, Dict, Any, Optional
 import pandas as pd
 
 
 class DataValidationError(Exception):
     """Custom exception raised when data validation checks fail."""
-    pass
 
 
 REQUIRED_COLUMNS = [
@@ -28,7 +26,7 @@ CATEGORICAL_COLUMNS = [
     "PaperlessBilling", "PaymentMethod"
 ]
 
-ALLOWED_CATEGORIES: Dict[str, List[str]] = {
+ALLOWED_CATEGORIES: dict[str, list[str]] = {
     "gender": ["Male", "Female"],
     "SeniorCitizen": [0, 1],
     "Partner": ["Yes", "No"],
@@ -77,10 +75,6 @@ class DataValidator:
             raise DataValidationError(f"Missing required columns in dataset: {missing_cols}")
 
     def _check_null_values(self, df: pd.DataFrame):
-        # Convert spaces to numeric if TotalCharges has empty string spaces
-        charges_copy = df["TotalCharges"].replace(" ", None)
-        null_counts = charges_copy.isna().sum()
-        
         # Allow small percentage of nulls (handled by imputer), but fail if excessive nulls (>10%)
         total_rows = len(df)
         for col in REQUIRED_COLUMNS:

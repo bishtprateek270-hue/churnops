@@ -3,7 +3,11 @@ Preprocessing module for ChurnOps pipeline.
 """
 
 import os
-from typing import Tuple, List, Dict, Any, Optional
+import sys
+
+# Ensure workspace root directory is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -11,8 +15,6 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-
-from src.data_validation import NUMERICAL_COLUMNS, CATEGORICAL_COLUMNS, CATEGORICAL_COLUMNS, ALLOWED_CATEGORIES
 
 
 def build_preprocessor() -> ColumnTransformer:
@@ -55,9 +57,9 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 def prepare_data(
     df: pd.DataFrame,
-    preprocessor: Optional[ColumnTransformer] = None,
+    preprocessor: ColumnTransformer | None = None,
     fit: bool = True
-) -> Tuple[np.ndarray, Optional[np.ndarray], ColumnTransformer, List[str]]:
+) -> tuple[np.ndarray, np.ndarray | None, ColumnTransformer, list[str]]:
     """Clean, preprocess data, and optionally extract target variable."""
     df_clean = clean_dataframe(df)
 
@@ -84,7 +86,7 @@ def prepare_data(
     return X_trans, y, preprocessor, feature_names
 
 
-def get_feature_names(preprocessor: ColumnTransformer) -> List[str]:
+def get_feature_names(preprocessor: ColumnTransformer) -> list[str]:
     """Retrieve output feature names after transformation."""
     feature_names = []
     for name, trans, cols in preprocessor.transformers_:

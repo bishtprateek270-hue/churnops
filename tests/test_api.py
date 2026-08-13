@@ -3,11 +3,12 @@ Unit tests for FastAPI serving endpoints (/health and /predict).
 """
 
 from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from api.main import app, model_store, init_sqlite_db
+from api.main import app, init_sqlite_db, model_store
 from data.generate_dataset import generate_telco_churn_data
 from src.preprocessing import prepare_data
 

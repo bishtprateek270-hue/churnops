@@ -2,22 +2,27 @@
 FastAPI Serving API for ChurnOps customer churn prediction.
 """
 
-import json
 import os
+import sys
+
+os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
+
+# Ensure workspace root directory is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import sqlite3
-from datetime import datetime, timezone
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 import joblib
-import numpy as np
-import pandas as pd
-from fastapi import FastAPI, HTTPException, status
 import mlflow
 import mlflow.pyfunc
+import pandas as pd
+from fastapi import FastAPI, HTTPException, status
 
 from api.schemas import ChurnInput, ChurnOutput, HealthResponse
-from src.data_validation import validate_data, DataValidationError
-from src.preprocessing import prepare_data, load_preprocessor
+from src.data_validation import DataValidationError, validate_data
+from src.preprocessing import load_preprocessor, prepare_data
 
 # Configuration
 MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns")
@@ -161,7 +166,6 @@ async def lifespan(app: FastAPI):
     load_model_and_preprocessor()
     yield
     # Shutdown logic
-    pass
 
 
 app = FastAPI(

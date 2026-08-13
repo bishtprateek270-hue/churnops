@@ -3,13 +3,21 @@ Evaluation module comparing candidate models against current Production model fo
 """
 
 import os
-from typing import Dict, Any, Tuple
+import sys
+
+os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
+
+# Ensure workspace root directory is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from typing import Any
+
 import joblib
-import numpy as np
-from sklearn.metrics import f1_score, roc_auc_score, accuracy_score, precision_score, recall_score
 import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
+import numpy as np
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 
 MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns")
 MODEL_NAME = "ChurnOps-Model"
@@ -33,7 +41,7 @@ def load_model_from_registry(stage: str):
         return None, None
 
 
-def evaluate_model_metrics(model, X_test: np.ndarray, y_test: np.ndarray) -> Dict[str, float]:
+def evaluate_model_metrics(model, X_test: np.ndarray, y_test: np.ndarray) -> dict[str, float]:
     """Calculate F1, ROC-AUC, Precision, Recall, Accuracy for a model."""
     y_pred = model.predict(X_test)
     
@@ -67,7 +75,7 @@ def evaluate_model_metrics(model, X_test: np.ndarray, y_test: np.ndarray) -> Dic
     }
 
 
-def compare_and_promote(promote: bool = True) -> Tuple[bool, Dict[str, Any]]:
+def compare_and_promote(promote: bool = True) -> tuple[bool, dict[str, Any]]:
     """Compare Staging model vs Production model on test dataset and promote if performance is superior."""
     mlflow.set_tracking_uri(MLFLOW_URI)
     client = mlflow.tracking.MlflowClient()

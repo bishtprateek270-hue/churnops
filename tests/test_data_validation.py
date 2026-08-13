@@ -2,10 +2,11 @@
 Unit tests for data validation logic.
 """
 
-import pytest
 import pandas as pd
+import pytest
+
 from data.generate_dataset import generate_telco_churn_data
-from src.data_validation import DataValidator, DataValidationError, validate_data
+from src.data_validation import DataValidationError, validate_data
 
 
 @pytest.fixture

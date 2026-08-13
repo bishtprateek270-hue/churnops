@@ -3,8 +3,14 @@ Data drift monitoring using Population Stability Index (PSI) and Kolmogorov-Smir
 """
 
 import os
+import sys
+
+# Ensure workspace root directory is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import sqlite3
-from typing import Dict, Any, List, Tuple
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from scipy.stats import ks_2samp
@@ -64,7 +70,7 @@ def calculate_psi_categorical(expected: pd.Series, actual: pd.Series) -> float:
     return float(psi)
 
 
-def compute_ks_test(expected: np.ndarray, actual: np.ndarray) -> Tuple[float, float]:
+def compute_ks_test(expected: np.ndarray, actual: np.ndarray) -> tuple[float, float]:
     """Compute 2-sample Kolmogorov-Smirnov test statistic and p-value."""
     expected = expected[~np.isnan(expected)]
     actual = actual[~np.isnan(actual)]
@@ -74,7 +80,7 @@ def compute_ks_test(expected: np.ndarray, actual: np.ndarray) -> Tuple[float, fl
     return float(stat), float(p_val)
 
 
-def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH) -> Dict[str, Any]:
+def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH) -> dict[str, Any]:
     """Compare distributions of live prediction inputs vs reference training dataset."""
     if not os.path.exists(train_path):
         raise FileNotFoundError(f"Baseline training dataset not found at {train_path}")

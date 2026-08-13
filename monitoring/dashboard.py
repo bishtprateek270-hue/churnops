@@ -3,14 +3,19 @@ Streamlit Monitoring Dashboard for ChurnOps MLOps Pipeline.
 """
 
 import os
-import sqlite3
-import pandas as pd
-import numpy as np
-import streamlit as st
-import matplotlib.pyplot as plt
-import seaborn as sns
+import sys
 
-from monitoring.drift_check import run_drift_analysis, DB_PATH, TRAIN_DATA_PATH
+# Ensure workspace root directory is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import sqlite3
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+import streamlit as st
+
+from monitoring.drift_check import DB_PATH, TRAIN_DATA_PATH, run_drift_analysis
 
 # Streamlit Page Setup
 st.set_page_config(

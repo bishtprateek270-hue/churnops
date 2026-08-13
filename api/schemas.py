@@ -2,7 +2,6 @@
 Pydantic schemas for FastAPI serving layer input/output validation.
 """
 
-from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
