@@ -87,12 +87,14 @@ jobs:
 
       - name: Download MLflow Tracking Store
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: mlflow-tracking-store
           path: mlruns/
 
       - name: Download Model Artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: model-artifacts
           path: models/
