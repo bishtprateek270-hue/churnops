@@ -174,7 +174,7 @@ def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH
     print("\n--- Data Drift Analysis Summary ---")
     print(f"Total Prediction Logs Evaluated: {total_logged_requests}")
     print(f"Max PSI Score Across Features: {max_psi:.4f}")
-    print(f"Drift Alert Triggered (PSI > 0.25): {'YES ⚠️' if drift_detected else 'NO ✅'}\n")
+    print(f"Drift Alert Triggered (PSI > 0.25): {'YES [ALERT]' if drift_detected else 'NO [OK]'}\n")
     for feat, metrics in feature_metrics.items():
         print(f"  {feat:20s} | PSI: {metrics['psi']:.4f} | Status: {metrics['status']}")
 
