@@ -12,12 +12,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Create application directories
+RUN mkdir -p /app/src /app/api /app/models /app/data /app/mlruns
+
 # Copy application files
 COPY src/ /app/src/
 COPY api/ /app/api/
-COPY models/ /app/models/
 COPY data/ /app/data/
-COPY mlruns/ /app/mlruns/
+COPY models* /app/models/
+COPY mlruns* /app/mlruns/
 
 EXPOSE 8000
 

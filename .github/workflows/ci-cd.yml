@@ -66,12 +66,14 @@ jobs:
         with:
           name: mlflow-tracking-store
           path: mlruns/
+          if-no-files-found: ignore
 
       - name: Archive Model Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: model-artifacts
           path: models/
+          if-no-files-found: ignore
 
   build-docker-image:
     name: Build Docker Image
