@@ -46,15 +46,19 @@ def run_retraining_pipeline():
     promoted, report = compare_and_promote(promote=True)
     
     print("\n=== Retraining Pipeline Summary ===")
-    print(f"Candidate Model Version: {report['candidate_version']}")
-    print(f"Candidate F1 Score: {report['candidate_metrics']['f1_score']:.4f}")
-    if report['production_version']:
-        print(f"Production Model Version: {report['production_version']}")
-        print(f"Production F1 Score: {report['production_metrics']['f1_score']:.4f}")
+    if "error" in report:
+        print(f"Promotion Status: {report['error']}")
     else:
-        print("Production Model: None (First deployment)")
-    
-    print(f"Model Promoted to Production: {'YES' if promoted else 'NO'}")
+        print(f"Candidate Model Version: {report.get('candidate_version', 'N/A')}")
+        if report.get("candidate_metrics"):
+            print(f"Candidate F1 Score: {report['candidate_metrics'].get('f1_score', 0.0):.4f}")
+        if report.get("production_version"):
+            print(f"Production Model Version: {report['production_version']}")
+            if report.get("production_metrics"):
+                print(f"Production F1 Score: {report['production_metrics'].get('f1_score', 0.0):.4f}")
+        else:
+            print("Production Model: None (First deployment)")
+        print(f"Model Promoted to Production: {'YES' if promoted else 'NO'}")
     return report
 
 
