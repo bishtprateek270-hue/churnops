@@ -33,6 +33,7 @@ jobs:
 
       - name: Run Unit Tests
         run: |
+          python data/generate_dataset.py
           pytest tests/ -v --tb=short
 
   retrain-and-evaluate:

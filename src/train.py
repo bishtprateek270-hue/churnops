@@ -163,8 +163,16 @@ def train_and_evaluate(
         progress_callback(10, "Step 1/5: Loading and preprocessing dataset...")
 
     t0 = time.perf_counter()
-    print(f"Loading raw data from {data_path}...")
-    df = pd.read_csv(data_path)
+    if not os.path.exists(data_path):
+        print(f"Dataset not found at {data_path}. Generating dataset...")
+        from data.generate_dataset import generate_telco_churn_data
+        df = generate_telco_churn_data()
+        if "/" in data_path or "\\" in data_path:
+            os.makedirs(os.path.dirname(data_path), exist_ok=True)
+            df.to_csv(data_path, index=False)
+    else:
+        print(f"Loading raw data from {data_path}...")
+        df = pd.read_csv(data_path)
 
     # 1. Dataset Inspection & Validation
     inspect_dataset(df, target_col=target_col or "Churn")
