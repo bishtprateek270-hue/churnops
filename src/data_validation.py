@@ -3,8 +3,8 @@ Data validation module for ChurnOps pipeline.
 Supports dataset-agnostic schema, target, and null-value validation.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 class DataValidationError(Exception):
@@ -88,13 +88,12 @@ class DataValidator:
                 raise DataValidationError("Column 'tenure' contains values outside range [0, 120].")
 
     def _check_categorical_values(self, df: pd.DataFrame):
-        if self.required_columns:
-            if "Contract" in df.columns:
-                allowed = ["Month-to-month", "One year", "Two year"]
-                unique_vals = set(df["Contract"].dropna().unique())
-                invalid = unique_vals - set(allowed)
-                if invalid:
-                    raise DataValidationError(f"Column 'Contract' contains invalid categorical values: {invalid}")
+        if self.required_columns and "Contract" in df.columns:
+            allowed = ["Month-to-month", "One year", "Two year"]
+            unique_vals = set(df["Contract"].dropna().unique())
+            invalid = unique_vals - set(allowed)
+            if invalid:
+                raise DataValidationError(f"Column 'Contract' contains invalid categorical values: {invalid}")
 
     def _check_target(self, df: pd.DataFrame, target_name: str | None):
         if not target_name or target_name not in df.columns:

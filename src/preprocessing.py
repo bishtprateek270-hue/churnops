@@ -18,16 +18,16 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 __all__ = [
-    "GenericFeatureEngineer",
     "ChurnFeatureEngineer",
+    "GenericFeatureEngineer",
     "build_preprocessor",
     "clean_dataframe",
     "find_target_col",
-    "prepare_data",
     "get_feature_names",
-    "save_preprocessor",
-    "load_preprocessor",
     "infer_task_type",
+    "load_preprocessor",
+    "prepare_data",
+    "save_preprocessor",
 ]
 
 
@@ -91,8 +91,9 @@ class GenericFeatureEngineer(BaseEstimator, TransformerMixin):
 
 
 import __main__
-setattr(__main__, "GenericFeatureEngineer", GenericFeatureEngineer)
-setattr(__main__, "ChurnFeatureEngineer", GenericFeatureEngineer)
+
+__main__.GenericFeatureEngineer = GenericFeatureEngineer
+__main__.ChurnFeatureEngineer = GenericFeatureEngineer
 ChurnFeatureEngineer = GenericFeatureEngineer
 
 
@@ -190,7 +191,7 @@ def prepare_data(
             else:
                 num_vals = pd.to_numeric(target_series, errors="coerce").fillna(0.0)
                 unique_nums = set(np.unique(num_vals.values))
-                if unique_nums.issubset({0, 1, 0.0, 1.0}):
+                if unique_nums.issubset({0, 1}):
                     y = np.where(num_vals.values > 0.5, 1, 0)
                 else:
                     y = np.where(num_vals.values > np.median(num_vals.values), 1, 0)
@@ -206,12 +207,8 @@ def prepare_data(
         drop_cols.append(found_target)
     for col in df_clean.columns:
         col_lower = col.lower()
-        if col_lower in ["customerid", "id", "index", "rownumber", "user_id"] or col_lower.endswith("_id"):
-            if col not in drop_cols:
-                drop_cols.append(col)
-        elif (df_clean[col].dtype == object or str(df_clean[col].dtype) == "string") and df_clean[col].nunique() == len(df_clean) and len(df_clean) > 20:
-            if col not in drop_cols:
-                drop_cols.append(col)
+        if (col_lower in ["customerid", "id", "index", "rownumber", "user_id"] or col_lower.endswith("_id") or (df_clean[col].dtype == object or str(df_clean[col].dtype) == "string") and df_clean[col].nunique() == len(df_clean) and len(df_clean) > 20) and col not in drop_cols:
+            drop_cols.append(col)
 
     X_df = df_clean.drop(columns=drop_cols, errors="ignore")
 

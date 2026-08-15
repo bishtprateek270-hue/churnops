@@ -8,21 +8,23 @@ import sys
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import joblib
-import pandas as pd
-import numpy as np
 import importlib
+
+import joblib
+import numpy as np
+import pandas as pd
 
 import __main__
 import src.preprocessing
+
 importlib.reload(src.preprocessing)
 
 from src.data_validation import DataValidationError, validate_data
 from src.preprocessing import GenericFeatureEngineer, find_target_col, load_preprocessor, prepare_data
 from src.train import train_and_evaluate
 
-setattr(__main__, "GenericFeatureEngineer", GenericFeatureEngineer)
-setattr(__main__, "ChurnFeatureEngineer", GenericFeatureEngineer)
+__main__.GenericFeatureEngineer = GenericFeatureEngineer
+__main__.ChurnFeatureEngineer = GenericFeatureEngineer
 
 MODEL_PATH = "models/best_model.joblib"
 PREPROCESSOR_PATH = "models/preprocessor.joblib"

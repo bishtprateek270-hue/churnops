@@ -6,10 +6,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from monitoring.predict_utils import predict_customers, predict_single_row
 from src.data_validation import validate_data
 from src.preprocessing import prepare_data
 from src.train import train_and_evaluate
-from monitoring.predict_utils import predict_customers, predict_single_row
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def test_custom_dataset_validation(custom_dataset):
 
 def test_custom_dataset_preprocessing(custom_dataset):
     """Test dynamic feature extraction and preprocessing on custom column names."""
-    X_trans, y, preprocessor, feature_names = prepare_data(custom_dataset, fit=True, target_col="target")
+    X_trans, y, preprocessor, _feature_names = prepare_data(custom_dataset, fit=True, target_col="target")
 
     assert isinstance(X_trans, np.ndarray)
     assert X_trans.shape[0] == 100
@@ -76,7 +76,7 @@ def test_custom_dataset_with_nan_target(custom_dataset):
     df_nan_target.loc[0, "target"] = np.nan
     df_nan_target.loc[5, "target"] = None
 
-    X_trans, y, preprocessor, feature_names = prepare_data(df_nan_target, fit=True, target_col="target")
+    X_trans, y, _preprocessor, _feature_names = prepare_data(df_nan_target, fit=True, target_col="target")
     assert X_trans.shape[0] == 98
     assert y is not None
     assert len(y) == 98

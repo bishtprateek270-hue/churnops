@@ -4,14 +4,15 @@ on both Classification datasets (Telco Churn) and Regression datasets (Housing P
 """
 
 import os
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from data.generate_dataset import generate_telco_churn_data
-from src.preprocessing import prepare_data, infer_task_type
-from src.train import train_and_evaluate
 from monitoring.predict_utils import load_trained_artifacts, predict_customers, predict_single_row
+from src.preprocessing import infer_task_type
+from src.train import train_and_evaluate
 
 
 @pytest.fixture
@@ -46,7 +47,7 @@ def test_classification_end_to_end(tmp_path):
     assert train_res["task_type"] == "classification"
     assert os.path.exists("models/unified_pipeline.joblib")
 
-    model, preprocessor, opt_th, status = load_trained_artifacts()
+    model, preprocessor, _opt_th, status = load_trained_artifacts()
     assert status == "OK"
     assert model is not None
     assert preprocessor is not None
@@ -66,7 +67,7 @@ def test_regression_end_to_end(regression_dataset, tmp_path):
     assert train_res["task_type"] == "regression"
     assert os.path.exists("models/unified_pipeline.joblib")
 
-    model, preprocessor, opt_th, status = load_trained_artifacts()
+    model, preprocessor, _opt_th, status = load_trained_artifacts()
     assert status == "OK"
     assert model is not None
     assert preprocessor is not None
@@ -100,7 +101,7 @@ def test_infinities_and_missing_values_end_to_end(tmp_path):
     assert train_res["task_type"] == "classification"
     assert os.path.exists("models/unified_pipeline.joblib")
 
-    model, preprocessor, opt_th, status = load_trained_artifacts()
+    _model, _preprocessor, _opt_th, status = load_trained_artifacts()
     assert status == "OK"
 
     batch_preds = predict_customers(df.head(10))

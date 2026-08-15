@@ -7,29 +7,25 @@ holdout test set metrics evaluation, single-pass SHAP generation, and MLflow tra
 import os
 import sys
 import time
-import tempfile
 
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import joblib
 import matplotlib
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import mlflow
 import mlflow.sklearn
 import numpy as np
-import pandas as pd
-import seaborn as sns
 import optuna
-
+import pandas as pd
 from catboost import CatBoostClassifier, CatBoostRegressor
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline as ImbPipeline
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_auc_score, roc_curve
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from xgboost import XGBClassifier, XGBRegressor
 
@@ -40,7 +36,6 @@ from src.evaluate import (
     generate_shap_plots,
     log_classification_plots,
     optimize_business_threshold,
-    perform_error_analysis,
     plot_calibration_curve_to_file,
 )
 from src.preprocessing import prepare_data, save_preprocessor
@@ -172,7 +167,7 @@ def train_and_evaluate(
     df = pd.read_csv(data_path)
 
     # 1. Dataset Inspection & Validation
-    inspection = inspect_dataset(df, target_col=target_col or "Churn")
+    inspect_dataset(df, target_col=target_col or "Churn")
     leakage_cols = detect_data_leakage(df, target_col=target_col or "Churn")
     if leakage_cols:
         print(f"Warning: Potential data leakage columns detected: {leakage_cols}")
@@ -187,18 +182,16 @@ def train_and_evaluate(
     print(f"Inferred Task Type: {task_type.upper()}")
 
     stratify_arg = None
-    if task_type == "classification" and y is not None and len(np.unique(y)) > 1 and len(y) >= 20:
-        if np.issubdtype(y.dtype, np.integer) and np.min(np.bincount(y)) >= 2:
-            stratify_arg = y
+    if task_type == "classification" and y is not None and len(np.unique(y)) > 1 and len(y) >= 20 and np.issubdtype(y.dtype, np.integer) and np.min(np.bincount(y)) >= 2:
+        stratify_arg = y
 
     X_train, X_temp, y_train, y_temp = train_test_split(
         X_trans, y, test_size=0.30, random_state=42, stratify=stratify_arg
     )
 
     stratify_temp = None
-    if task_type == "classification" and y_temp is not None and len(np.unique(y_temp)) > 1 and len(y_temp) >= 10:
-        if np.issubdtype(y_temp.dtype, np.integer) and np.min(np.bincount(y_temp)) >= 2:
-            stratify_temp = y_temp
+    if task_type == "classification" and y_temp is not None and len(np.unique(y_temp)) > 1 and len(y_temp) >= 10 and np.issubdtype(y_temp.dtype, np.integer) and np.min(np.bincount(y_temp)) >= 2:
+        stratify_temp = y_temp
 
     X_val, X_test, y_val, y_test = train_test_split(
         X_temp, y_temp, test_size=0.50, random_state=42, stratify=stratify_temp
@@ -354,7 +347,7 @@ def train_and_evaluate(
     if progress_callback:
         progress_callback(90, "Step 4/5: Registering model & saving pipeline artifacts...")
 
-    t0_registry = time.perf_counter()
+    time.perf_counter()
     print(f"\nBest Model Selected: {best_model_name} (Best Score: {best_score:.4f}, Run ID: {best_run_id})")
 
     # Register best model in MLflow Model Registry

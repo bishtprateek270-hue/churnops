@@ -8,6 +8,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mlflow
@@ -125,7 +126,7 @@ def generate_eda_report(df: pd.DataFrame, target_col: str = "Churn", output_dir:
         report_artifacts["correlation_matrix_plot"] = corr_path
 
     if mlflow.active_run():
-        for name, path in report_artifacts.items():
+        for path in report_artifacts.values():
             mlflow.log_artifact(path, artifact_path="eda")
 
     return report_artifacts

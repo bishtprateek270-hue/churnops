@@ -5,21 +5,19 @@ SHAP plot generation, probability calibration, and unified pipeline saving/loadi
 """
 
 import os
-import joblib
+
 import numpy as np
-import pandas as pd
 import pytest
 
 from data.generate_dataset import generate_telco_churn_data
+from monitoring.predict_utils import load_trained_artifacts, predict_single_row
 from src.eda_inspector import detect_data_leakage, inspect_dataset
 from src.evaluate import (
     calculate_all_metrics,
     optimize_business_threshold,
-    perform_error_analysis,
 )
-from src.preprocessing import GenericFeatureEngineer, prepare_data
+from src.preprocessing import GenericFeatureEngineer
 from src.train import train_and_evaluate
-from monitoring.predict_utils import load_trained_artifacts, predict_customers, predict_single_row
 
 
 @pytest.fixture
