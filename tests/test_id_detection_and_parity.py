@@ -53,7 +53,7 @@ def test_house_prices_and_telco_churn_id_exclusion():
     _, _, house_prep, house_names = prepare_data(house_df, fit=True, target_col="SalePrice")
     assert "Id" not in house_prep.feature_cols_
     assert "SalePrice" not in house_prep.feature_cols_
-    assert not any(name.startswith("Id") or name.startswith("SalePrice") for name in house_names)
+    assert not any(name.startswith(("Id", "SalePrice")) for name in house_names)
 
     _, _, telco_prep, telco_names = prepare_data(telco_df, fit=True, target_col="Churn")
     assert "customerID" not in telco_prep.feature_cols_

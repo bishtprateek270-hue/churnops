@@ -8,6 +8,8 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import re
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -16,8 +18,6 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-
-import re
 
 __all__ = [
     "ChurnFeatureEngineer",
@@ -64,10 +64,8 @@ def is_identifier_column(df: pd.DataFrame, col: str) -> bool:
 
     is_id_name = (
         col_lower in known_id_names
-        or col_lower.endswith("_id") or col_lower.endswith("-id")
-        or col_lower.startswith("id_") or col_lower.startswith("id-")
-        or col_lower.startswith("uuid_") or col_lower.endswith("_key")
-        or col_lower.endswith("_uuid") or col_lower.endswith("_hash")
+        or col_lower.endswith(("_id", "-id", "_key", "_uuid", "_hash"))
+        or col_lower.startswith(("id_", "id-", "uuid_"))
         or bool(re.search(r'(^|_|-|[a-z])(id|uuid|guid|hash|key)s?$', col_lower))
     )
 
@@ -172,7 +170,7 @@ ChurnFeatureEngineer = GenericFeatureEngineer
 
 
 from sklearn.feature_selection import VarianceThreshold
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
+from sklearn.preprocessing import OrdinalEncoder
 
 __all__ = [
     "ChurnFeatureEngineer",
@@ -372,9 +370,7 @@ def prepare_data(
 
         # Drop target, ID, and leakage columns in inference mode
         for col in df_clean.columns:
-            if ((found_target and col == found_target) or (stored_target and col == stored_target)) and col not in drop_cols:
-                drop_cols.append(col)
-            elif (col in id_cols or col in leakage_cols or is_identifier_column(df_clean, col)) and col not in drop_cols:
+            if ((found_target and col == found_target) or (stored_target and col == stored_target)) and col not in drop_cols or (col in id_cols or col in leakage_cols or is_identifier_column(df_clean, col)) and col not in drop_cols:
                 drop_cols.append(col)
 
         X_df = df_clean.drop(columns=drop_cols, errors="ignore")

@@ -292,9 +292,8 @@ with predict_tab_form:
     with st.form("manual_predict_form"):
         form_inputs = {}
         cols = st.columns(3)
-        col_idx = 0
         
-        for col_name in feature_cols:
+        for col_idx, col_name in enumerate(feature_cols):
             with cols[col_idx % 3]:
                 is_num = False
                 if source_df is not None and col_name in source_df.columns:
@@ -317,7 +316,6 @@ with predict_tab_form:
                     if not options:
                         options = ["Yes", "No"]
                     form_inputs[col_name] = st.selectbox(f"{col_name} (categorical)", options=options)
-            col_idx += 1
 
         submitted = st.form_submit_button("Predict", use_container_width=True)
 

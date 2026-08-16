@@ -23,8 +23,6 @@ import pandas as pd
 from catboost import CatBoostClassifier, CatBoostRegressor
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline as ImbPipeline
-from sklearn.pipeline import Pipeline
-from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import (
     HistGradientBoostingClassifier,
     HistGradientBoostingRegressor,
@@ -33,6 +31,7 @@ from sklearn.ensemble import (
 )
 from sklearn.linear_model import LogisticRegression, Ridge
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
+from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier, XGBRegressor
 
 from src.data_validation import DataValidationError, validate_data
@@ -47,7 +46,6 @@ from src.evaluate import (
 from src.preprocessing import (
     clean_dataframe,
     detect_identifier_columns,
-    detect_target_leakage,
     find_target_col,
     infer_task_type,
     prepare_data,

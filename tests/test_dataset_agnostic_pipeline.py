@@ -59,7 +59,7 @@ def test_high_cardinality_categorical_handling():
         "Target": np.random.choice([0, 1], size=n),
     })
 
-    X_trans, _, preprocessor, feature_names = prepare_data(df, fit=True, target_col="Target")
+    X_trans, _, preprocessor, _feature_names = prepare_data(df, fit=True, target_col="Target")
     assert getattr(preprocessor, "cat_high_cols_", []) == ["high_card_cat"]
     # Transformed shape must remain small (not 25 one-hot columns!)
     assert X_trans.shape[1] < 10
