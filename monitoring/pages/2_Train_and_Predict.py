@@ -279,33 +279,36 @@ with predict_tab_batch:
 with predict_tab_form:
     st.markdown("Enter feature values manually:")
     
-    num_cols = getattr(preprocessor, "num_cols_", ["tenure", "MonthlyCharges", "TotalCharges"])
-    cat_cols = getattr(preprocessor, "cat_cols_", ["gender", "Contract"])
+    feature_cols = getattr(preprocessor, "feature_cols_", [])
     
     with st.form("manual_predict_form"):
         form_inputs = {}
         cols = st.columns(3)
         col_idx = 0
         
-        for col_name in num_cols:
+        for col_name in feature_cols:
             with cols[col_idx % 3]:
-                default_val = 0.0
+                is_num = False
                 if source_df is not None and col_name in source_df.columns:
-                    try:
-                        default_val = float(source_df[col_name].dropna().median())
-                    except Exception:
-                        default_val = 0.0
-                form_inputs[col_name] = st.number_input(f"{col_name} (numerical)", value=default_val)
-            col_idx += 1
-            
-        for col_name in cat_cols:
-            with cols[col_idx % 3]:
-                options = []
-                if source_df is not None and col_name in source_df.columns:
-                    options = [str(x) for x in source_df[col_name].dropna().unique().tolist()]
-                if not options:
-                    options = ["Yes", "No"]
-                form_inputs[col_name] = st.selectbox(f"{col_name} (categorical)", options=options)
+                    is_num = pd.api.types.is_numeric_dtype(source_df[col_name])
+                else:
+                    is_num = col_name in getattr(preprocessor, "num_cols_", [])
+
+                if is_num:
+                    default_val = 0.0
+                    if source_df is not None and col_name in source_df.columns:
+                        try:
+                            default_val = float(source_df[col_name].dropna().median())
+                        except Exception:
+                            default_val = 0.0
+                    form_inputs[col_name] = st.number_input(f"{col_name} (numeric)", value=default_val)
+                else:
+                    options = []
+                    if source_df is not None and col_name in source_df.columns:
+                        options = [str(x) for x in source_df[col_name].dropna().unique().tolist()]
+                    if not options:
+                        options = ["Yes", "No"]
+                    form_inputs[col_name] = st.selectbox(f"{col_name} (categorical)", options=options)
             col_idx += 1
 
         submitted = st.form_submit_button("Predict", use_container_width=True)

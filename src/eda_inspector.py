@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from src.preprocessing import infer_task_type
+from src.preprocessing import infer_task_type, is_identifier_column
 
 
 def inspect_dataset(df: pd.DataFrame, target_col: str = "Churn") -> dict:
@@ -76,7 +76,7 @@ def detect_data_leakage(df: pd.DataFrame, target_col: str = "Churn") -> list[str
         target_numeric, _ = pd.factorize(df[target_col])
 
     for col in df.columns:
-        if col == target_col or col.lower() in ["customerid", "id", "index", "user_id"]:
+        if col == target_col or is_identifier_column(df, col):
             continue
 
         # Check perfect correlation with target

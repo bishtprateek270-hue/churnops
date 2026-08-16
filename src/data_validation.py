@@ -6,6 +6,8 @@ Supports dataset-agnostic schema, target, and null-value validation.
 import numpy as np
 import pandas as pd
 
+from src.preprocessing import is_identifier_column
+
 
 class DataValidationError(Exception):
     """Custom exception raised when data validation checks fail."""
@@ -66,7 +68,7 @@ class DataValidator:
                 raise DataValidationError(f"Missing required columns in dataset: {missing_cols}")
             return
 
-        feature_cols = [c for c in df.columns if c != target_name and c.lower() not in ["customerid", "id", "index"]]
+        feature_cols = [c for c in df.columns if c != target_name and not is_identifier_column(df, c)]
         if len(feature_cols) == 0:
             raise DataValidationError("Dataset must contain at least one feature column.")
 

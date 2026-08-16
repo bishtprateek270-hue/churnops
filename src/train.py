@@ -175,17 +175,20 @@ def train_and_evaluate(
         df = pd.read_csv(data_path)
 
     # 1. Dataset Inspection & Validation
-    inspect_dataset(df, target_col=target_col or "Churn")
-    leakage_cols = detect_data_leakage(df, target_col=target_col or "Churn")
+    from src.preprocessing import find_target_col
+    actual_target = find_target_col(df, target_col)
+
+    inspect_dataset(df, target_col=actual_target or "Churn")
+    leakage_cols = detect_data_leakage(df, target_col=actual_target or "Churn")
     if leakage_cols:
         print(f"Warning: Potential data leakage columns detected: {leakage_cols}")
 
-    generate_eda_report(df, target_col=target_col or "Churn")
-    validate_data(df, is_training=True, target_col=target_col)
+    generate_eda_report(df, target_col=actual_target or "Churn")
+    validate_data(df, is_training=True, target_col=actual_target)
 
     # 2. Split & Preprocessing
     print("Splitting dataset into Train (70%), Val (15%), Test (15%)...")
-    X_trans, y, preprocessor, feature_names = prepare_data(df, fit=True, target_col=target_col)
+    X_trans, y, preprocessor, feature_names = prepare_data(df, fit=True, target_col=actual_target)
     task_type = getattr(preprocessor, "task_type_", "classification")
     print(f"Inferred Task Type: {task_type.upper()}")
 
@@ -378,6 +381,9 @@ def train_and_evaluate(
         "optimal_threshold": best_threshold,
         "model_name": best_model_name,
         "feature_names": feature_names,
+        "raw_feature_cols": getattr(preprocessor, "feature_cols_", []),
+        "id_cols": getattr(preprocessor, "id_cols_", []),
+        "target_col": getattr(preprocessor, "target_col_", actual_target),
         "task_type": task_type,
     }
 

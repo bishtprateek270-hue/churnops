@@ -17,18 +17,92 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+import re
+
 __all__ = [
     "ChurnFeatureEngineer",
     "GenericFeatureEngineer",
     "build_preprocessor",
     "clean_dataframe",
+    "detect_identifier_columns",
     "find_target_col",
     "get_feature_names",
     "infer_task_type",
+    "is_identifier_column",
     "load_preprocessor",
     "prepare_data",
     "save_preprocessor",
 ]
+
+
+def is_identifier_column(df: pd.DataFrame, col: str) -> bool:
+    """Determine if a column is a true identifier based on column name and high uniqueness/monotonicity heuristics."""
+    s = df[col].dropna()
+    total_rows = len(df)
+    if total_rows == 0 or len(s) == 0:
+        return False
+
+    num_unique = s.nunique()
+    uniqueness_ratio = num_unique / total_rows
+    col_lower = col.lower().strip()
+
+    # Common false positive words containing "id" substring that are valid features
+    false_positives = {
+        "fluid", "solid", "liquid", "hybrid", "valid", "invalid", "grid",
+        "pyramid", "squid", "asteroid", "android", "centroid", "humanoid", "orchid", "idea", "ideology"
+    }
+    if col_lower in false_positives:
+        return False
+
+    # Check if column name strongly indicates an identifier token/suffix
+    known_id_names = {
+        "id", "id_num", "uuid", "hash", "key", "guid", "index", "rownumber",
+        "row_num", "row_id", "record_id", "customerid", "userid", "transactionid",
+        "houseid", "buildingid", "orderid", "patientid", "accountid", "memberid",
+        "clientid", "subjectid", "itemid", "productid", "sessionid", "sub_id"
+    }
+
+    is_id_name = (
+        col_lower in known_id_names
+        or col_lower.endswith("_id") or col_lower.endswith("-id")
+        or col_lower.startswith("id_") or col_lower.startswith("id-")
+        or col_lower.startswith("uuid_") or col_lower.endswith("_key")
+        or col_lower.endswith("_uuid") or col_lower.endswith("_hash")
+        or bool(re.search(r'(^|_|-|[a-z])(id|uuid|guid|hash|key)s?$', col_lower))
+    )
+
+    # Monotonicity check for numerical series
+    is_monotonic = False
+    if pd.api.types.is_numeric_dtype(s) and len(s) > 1:
+        diffs = s.diff().dropna()
+        if len(diffs) > 0:
+            is_monotonic = bool((diffs > 0).all() or (diffs < 0).all() or (diffs == 1).all())
+
+    # Decision heuristics:
+    if is_id_name:
+        if total_rows <= 10:
+            return num_unique == total_rows
+        # Name indicates ID: confirm with moderate/high uniqueness or monotonicity
+        return (uniqueness_ratio > 0.50) or is_monotonic or (num_unique == total_rows)
+    else:
+        # High uniqueness/monotonicity for un-named string keys or primary key ints (>20 rows)
+        if (s.dtype == object or str(s.dtype) in ["string", "category"]) and total_rows > 20:
+            return uniqueness_ratio > 0.95
+        if pd.api.types.is_integer_dtype(s) and total_rows > 50:
+            return is_monotonic and (uniqueness_ratio > 0.90)
+
+    return False
+
+
+def detect_identifier_columns(df: pd.DataFrame, target_col: str | None = None) -> list[str]:
+    """Detect all true identifier columns in DataFrame to exclude them from ML training/inference."""
+    id_cols = []
+    for col in df.columns:
+        if target_col and col == target_col:
+            continue
+        if is_identifier_column(df, col):
+            id_cols.append(col)
+    return id_cols
 
 
 def infer_task_type(target_series: pd.Series) -> str:
@@ -201,18 +275,19 @@ def prepare_data(
             num_vals = pd.to_numeric(target_series, errors="coerce").fillna(0.0)
             y = np.asarray(num_vals.values, dtype=np.float64)
 
-    # Drop target and common ID columns
+    # Drop target and true identifier columns
     drop_cols = []
     if found_target:
         drop_cols.append(found_target)
-    for col in df_clean.columns:
-        col_lower = col.lower()
-        if (col_lower in ["customerid", "id", "index", "rownumber", "user_id"] or col_lower.endswith("_id") or (df_clean[col].dtype == object or str(df_clean[col].dtype) == "string") and df_clean[col].nunique() == len(df_clean) and len(df_clean) > 20) and col not in drop_cols:
-            drop_cols.append(col)
-
-    X_df = df_clean.drop(columns=drop_cols, errors="ignore")
 
     if fit:
+        id_cols = detect_identifier_columns(df_clean, target_col=found_target)
+        for col in id_cols:
+            if col not in drop_cols:
+                drop_cols.append(col)
+
+        X_df = df_clean.drop(columns=drop_cols, errors="ignore")
+
         engineer = GenericFeatureEngineer()
         X_engineered = engineer.transform(X_df)
         num_cols = X_engineered.select_dtypes(include=[np.number]).columns.tolist()
@@ -228,12 +303,26 @@ def prepare_data(
 
         preprocessor = pipeline
         preprocessor.feature_cols_ = list(X_df.columns)
+        preprocessor.id_cols_ = id_cols
         preprocessor.num_cols_ = num_cols
         preprocessor.cat_cols_ = cat_cols
         preprocessor.target_col_ = found_target
         preprocessor.task_type_ = task_type
+        preprocessor.feature_names_ = get_feature_names(preprocessor)
     else:
         feature_cols = getattr(preprocessor, "feature_cols_", None)
+        id_cols = getattr(preprocessor, "id_cols_", [])
+        stored_target = getattr(preprocessor, "target_col_", None)
+
+        # Drop target and any identifier columns in inference mode
+        for col in df_clean.columns:
+            if ((found_target and col == found_target) or (stored_target and col == stored_target)) and col not in drop_cols:
+                drop_cols.append(col)
+            elif (col in id_cols or is_identifier_column(df_clean, col)) and col not in drop_cols:
+                drop_cols.append(col)
+
+        X_df = df_clean.drop(columns=drop_cols, errors="ignore")
+
         if feature_cols:
             aligned_df = pd.DataFrame(index=X_df.index)
             for col in feature_cols:
@@ -252,7 +341,7 @@ def prepare_data(
         else:
             raise ValueError("Invalid preprocessor pipeline provided.")
 
-    feature_names = get_feature_names(preprocessor)
+    feature_names = getattr(preprocessor, "feature_names_", None) or get_feature_names(preprocessor)
     return X_trans, y, preprocessor, feature_names
 
 
