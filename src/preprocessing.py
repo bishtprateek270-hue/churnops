@@ -320,7 +320,7 @@ def prepare_data(
     """Clean, engineer features, preprocess data, and extract target variable safely."""
     df_clean = clean_dataframe(df)
 
-    found_target = find_target_col(df_clean, target_col)
+    found_target = target_col if (target_col and target_col in df_clean.columns) else None
     y = None
     task_type = "classification"
 
