@@ -128,9 +128,17 @@ class GenericFeatureEngineer(BaseEstimator, TransformerMixin):
     """Custom scikit-learn transformer for dataset-agnostic leak-free feature engineering."""
 
     def __init__(self):
-        pass
+        self.interaction_pair_ = None
+        self.has_cat_cols_ = False
+        self.cat_cols_ = []
 
     def fit(self, X, y=None):
+        if isinstance(X, pd.DataFrame):
+            num_cols = X.select_dtypes(include=[np.number]).columns.tolist()
+            cat_cols = X.select_dtypes(exclude=[np.number]).columns.tolist()
+            self.interaction_pair_ = (num_cols[0], num_cols[1]) if len(num_cols) >= 2 else None
+            self.has_cat_cols_ = bool(cat_cols)
+            self.cat_cols_ = cat_cols
         return self
 
     def transform(self, X):
@@ -138,25 +146,42 @@ class GenericFeatureEngineer(BaseEstimator, TransformerMixin):
         if not isinstance(X_out, pd.DataFrame):
             return X_out
 
-        num_cols = X_out.select_dtypes(include=[np.number]).columns.tolist()
-        cat_cols = X_out.select_dtypes(exclude=[np.number]).columns.tolist()
-
         # 1. Numerical interaction features (ratios between top numerical pairs)
-        if len(num_cols) >= 2:
-            col1, col2 = num_cols[0], num_cols[1]
-            val1 = pd.to_numeric(X_out[col1], errors="coerce").fillna(0.0)
-            val2 = pd.to_numeric(X_out[col2], errors="coerce").fillna(1e-5)
-            denom = np.where(val2.abs() < 1e-5, 1e-5, val2)
-            ratio = val1 / denom
-            ratio = np.where(np.isinf(ratio), np.nan, ratio)
-            X_out[f"{col1}_per_{col2}"] = ratio
+        if hasattr(self, "interaction_pair_") and self.interaction_pair_:
+            col1, col2 = self.interaction_pair_
+            ratio_name = f"{col1}_per_{col2}"
+            if col1 in X_out.columns and col2 in X_out.columns:
+                val1 = pd.to_numeric(X_out[col1], errors="coerce").fillna(0.0)
+                val2 = pd.to_numeric(X_out[col2], errors="coerce").fillna(1e-5)
+                denom = np.where(val2.abs() < 1e-5, 1e-5, val2)
+                ratio = val1 / denom
+                ratio = np.where(np.isinf(ratio), np.nan, ratio)
+                X_out[ratio_name] = ratio
+            else:
+                X_out[ratio_name] = np.nan
+        else:
+            num_cols = X_out.select_dtypes(include=[np.number]).columns.tolist()
+            if len(num_cols) >= 2:
+                col1, col2 = num_cols[0], num_cols[1]
+                val1 = pd.to_numeric(X_out[col1], errors="coerce").fillna(0.0)
+                val2 = pd.to_numeric(X_out[col2], errors="coerce").fillna(1e-5)
+                denom = np.where(val2.abs() < 1e-5, 1e-5, val2)
+                ratio = val1 / denom
+                ratio = np.where(np.isinf(ratio), np.nan, ratio)
+                X_out[f"{col1}_per_{col2}"] = ratio
 
         # 2. Total active non-null categorical services/features count
-        if cat_cols:
+        has_cat = getattr(self, "has_cat_cols_", False)
+        known_cats = getattr(self, "cat_cols_", [])
+        cat_cols_in_x = X_out.select_dtypes(exclude=[np.number]).columns.tolist()
+
+        if has_cat or cat_cols_in_x or known_cats:
             non_null_counts = pd.Series(0.0, index=X_out.index)
-            for c in cat_cols:
-                is_valid = X_out[c].notna() & (~X_out[c].astype(str).str.strip().str.lower().isin(["no", "none", "false", "0", "nan", ""]))
-                non_null_counts += np.where(is_valid, 1.0, 0.0)
+            target_cats = known_cats if known_cats else cat_cols_in_x
+            for c in target_cats:
+                if c in X_out.columns:
+                    is_valid = X_out[c].notna() & (~X_out[c].astype(str).str.strip().str.lower().isin(["no", "none", "false", "0", "nan", ""]))
+                    non_null_counts += np.where(is_valid, 1.0, 0.0)
             X_out["active_cat_features_count"] = non_null_counts
 
         return X_out

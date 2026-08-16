@@ -199,6 +199,15 @@ def train_and_evaluate(
         print(f"Loading raw dataset from {data_path}...")
         df = pd.read_csv(data_path)
 
+    os.makedirs("reports/plots", exist_ok=True)
+    for p_name in ["confusion_matrix.png", "roc_curve.png", "pr_curve.png", "calibration_curve.png", "shap_summary.png"]:
+        p_file = os.path.join("reports/plots", p_name)
+        if os.path.exists(p_file):
+            try:
+                os.remove(p_file)
+            except Exception as exc:
+                print(f"Notice: Plot cleanup note: {exc}")
+
     df_clean = clean_dataframe(df)
     actual_target = find_target_col(df_clean, target_col)
     if not actual_target or actual_target not in df_clean.columns:
@@ -209,6 +218,11 @@ def train_and_evaluate(
             f"Target column '{actual_target}' appears to be a unique row identifier, not a predictable target variable. "
             f"Please select a valid non-identifier target column or check 'I understand and want to train on this identifier column anyway' to proceed."
         )
+
+    # Filter out rows with missing target values
+    valid_target_mask = df_clean[actual_target].notna() & (~df_clean[actual_target].astype(str).str.strip().str.lower().isin(["nan", "none", "null", "n/a", ""]))
+    if not valid_target_mask.all():
+        df_clean = df_clean[valid_target_mask].reset_index(drop=True)
 
     task_type = infer_task_type(df_clean[actual_target])
     print(f"Target Column: '{actual_target}' | Inferred Task Type: {task_type.upper()}")

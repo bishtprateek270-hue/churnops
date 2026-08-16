@@ -113,11 +113,49 @@ def generate_telco_churn_data(num_samples: int = 7043, seed: int = 42) -> pd.Dat
     return df
 
 
+def generate_kaggle_house_prices_data(num_samples: int = 1460, seed: int = 42) -> pd.DataFrame:
+    np.random.seed(seed)
+    ids = range(1, num_samples + 1)
+    overall_qual = np.random.randint(1, 11, size=num_samples)
+    gr_liv_area = np.random.randint(600, 4500, size=num_samples)
+    total_bsmt_sf = np.random.randint(0, 3000, size=num_samples)
+    garage_cars = np.random.randint(0, 4, size=num_samples)
+    year_built = np.random.randint(1900, 2021, size=num_samples)
+    neighborhood = np.random.choice(["NAmes", "CollgCr", "OldTown", "Edwards", "Somerst"], size=num_samples)
+
+    sale_price = (
+        10000.0
+        + overall_qual * 15000.0
+        + gr_liv_area * 60.0
+        + total_bsmt_sf * 40.0
+        + garage_cars * 8000.0
+        + (year_built - 1900) * 300.0
+        + np.random.normal(0, 15000, size=num_samples)
+    ).round(2)
+
+    df = pd.DataFrame({
+        "Id": ids,
+        "OverallQual": overall_qual,
+        "GrLivArea": gr_liv_area,
+        "TotalBsmtSF": total_bsmt_sf,
+        "GarageCars": garage_cars,
+        "YearBuilt": year_built,
+        "Neighborhood": neighborhood,
+        "SalePrice": np.clip(sale_price, 30000.0, None)
+    })
+    return df
+
+
 if __name__ == "__main__":
     os.makedirs("data/raw", exist_ok=True)
     os.makedirs("data/processed", exist_ok=True)
-    
-    data_path = "data/raw/telco_churn.csv"
-    df = generate_telco_churn_data()
-    df.to_csv(data_path, index=False)
-    print(f"Generated synthetic dataset with {len(df)} rows at {data_path}")
+
+    telco_path = "data/raw/telco_churn.csv"
+    df_telco = generate_telco_churn_data()
+    df_telco.to_csv(telco_path, index=False)
+    print(f"Generated synthetic dataset with {len(df_telco)} rows at {telco_path}")
+
+    house_path = "data/raw/kaggle_house_prices.csv"
+    df_house = generate_kaggle_house_prices_data()
+    df_house.to_csv(house_path, index=False)
+    print(f"Generated synthetic dataset with {len(df_house)} rows at {house_path}")

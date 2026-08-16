@@ -3,6 +3,8 @@ Unit tests verifying heuristic identifier column detection, exact feature schema
 exclusion of IDs from training/SHAP, and prediction parity between dataset-row selection and manual input.
 """
 
+import os
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -47,6 +49,14 @@ def test_id_detection_heuristics():
 
 def test_house_prices_and_telco_churn_id_exclusion():
     """Verify that Kaggle House Prices dataset ('Id') and Telco Churn ('customerID') exclude IDs from feature schema."""
+    os.makedirs("data/raw", exist_ok=True)
+    if not os.path.exists("data/raw/kaggle_house_prices.csv"):
+        from data.generate_dataset import generate_kaggle_house_prices_data
+        generate_kaggle_house_prices_data().to_csv("data/raw/kaggle_house_prices.csv", index=False)
+    if not os.path.exists("data/raw/telco_churn.csv"):
+        from data.generate_dataset import generate_telco_churn_data
+        generate_telco_churn_data().to_csv("data/raw/telco_churn.csv", index=False)
+
     house_df = pd.read_csv("data/raw/kaggle_house_prices.csv")
     telco_df = pd.read_csv("data/raw/telco_churn.csv")
 
