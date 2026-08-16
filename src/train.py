@@ -48,6 +48,7 @@ from src.preprocessing import (
     detect_identifier_columns,
     find_target_col,
     infer_task_type,
+    is_identifier_column,
     prepare_data,
     save_preprocessor,
 )
@@ -175,6 +176,7 @@ def train_and_evaluate(
     target_col: str | None = None,
     fast_mode: bool = True,
     n_optuna_trials: int = 5,
+    allow_id_target: bool = False,
     progress_callback: object | None = None,
 ) -> dict:
     """Train dataset-agnostic model suite with pre-fit train/holdout split, CV model selection, and single-pass holdout evaluation."""
@@ -201,6 +203,12 @@ def train_and_evaluate(
     actual_target = find_target_col(df_clean, target_col)
     if not actual_target or actual_target not in df_clean.columns:
         raise DataValidationError("Target column could not be resolved from dataset.")
+
+    if is_identifier_column(df_clean, actual_target) and not allow_id_target:
+        raise DataValidationError(
+            f"Target column '{actual_target}' appears to be a unique row identifier, not a predictable target variable. "
+            f"Please select a valid non-identifier target column or check 'I understand and want to train on this identifier column anyway' to proceed."
+        )
 
     task_type = infer_task_type(df_clean[actual_target])
     print(f"Target Column: '{actual_target}' | Inferred Task Type: {task_type.upper()}")
@@ -318,29 +326,34 @@ def train_and_evaluate(
             best_params = {} if fast_mode else run_optuna_tuning(name, X_train, y_train, task_type=task_type, n_trials=n_optuna_trials)
 
             if task_type == "classification":
-                if name == "Logistic_Regression":
-                    base_clf = LogisticRegression(**best_params, max_iter=1000, random_state=42, class_weight="balanced")
-                elif name == "Random_Forest":
-                    base_clf = RandomForestClassifier(**best_params, n_estimators=100, max_depth=8, n_jobs=-1, random_state=42, class_weight="balanced")
-                elif name == "HistGradientBoosting":
-                    base_clf = HistGradientBoostingClassifier(**best_params, learning_rate=0.1, max_depth=6, random_state=42)
-                elif name == "XGBoost":
-                    base_clf = XGBClassifier(**best_params, n_estimators=100, max_depth=6, learning_rate=0.1, n_jobs=-1, random_state=42, eval_metric="logloss")
-                elif name == "CatBoost":
-                    base_clf = CatBoostClassifier(**best_params, iterations=100, depth=6, learning_rate=0.1, verbose=0, random_seed=42, thread_count=-1)
-                else:
-                    base_clf = LogisticRegression(max_iter=1000, random_state=42)
-
-                use_smote = (len(y_train) >= 20 and np.min(np.bincount(y_train)) >= 2)
-                if use_smote and name not in ["HistGradientBoosting"]:
-                    model_pipeline = ImbPipeline([
-                        ("smote", SMOTE(random_state=42)),
-                        ("classifier", base_clf)
-                    ])
-                else:
-                    model_pipeline = Pipeline([("classifier", base_clf)])
-
                 try:
+                    if name == "Logistic_Regression":
+                        params = {"max_iter": 1000, "class_weight": "balanced", **best_params}
+                        base_clf = LogisticRegression(**params, random_state=42)
+                    elif name == "Random_Forest":
+                        params = {"n_estimators": 100, "max_depth": 8, "class_weight": "balanced", **best_params}
+                        base_clf = RandomForestClassifier(**params, n_jobs=-1, random_state=42)
+                    elif name == "HistGradientBoosting":
+                        params = {"learning_rate": 0.1, "max_depth": 6, **best_params}
+                        base_clf = HistGradientBoostingClassifier(**params, random_state=42)
+                    elif name == "XGBoost":
+                        params = {"n_estimators": 100, "max_depth": 6, "learning_rate": 0.1, "eval_metric": "logloss", **best_params}
+                        base_clf = XGBClassifier(**params, n_jobs=-1, random_state=42)
+                    elif name == "CatBoost":
+                        params = {"iterations": 100, "depth": 6, "learning_rate": 0.1, "verbose": 0, **best_params}
+                        base_clf = CatBoostClassifier(**params, random_seed=42, thread_count=-1)
+                    else:
+                        base_clf = LogisticRegression(max_iter=1000, random_state=42)
+
+                    use_smote = (len(y_train) >= 20 and np.min(np.bincount(y_train)) >= 2)
+                    if use_smote and name not in ["HistGradientBoosting"]:
+                        model_pipeline = ImbPipeline([
+                            ("smote", SMOTE(random_state=42)),
+                            ("classifier", base_clf)
+                        ])
+                    else:
+                        model_pipeline = Pipeline([("classifier", base_clf)])
+
                     model_pipeline.fit(X_train, y_train)
                     final_model_obj = model_pipeline
 
@@ -360,20 +373,25 @@ def train_and_evaluate(
 
                 eval_threshold = opt_th
             else:
-                if name == "Ridge":
-                    reg = Ridge(**best_params, random_state=42)
-                elif name == "Random_Forest":
-                    reg = RandomForestRegressor(**best_params, n_estimators=100, max_depth=8, n_jobs=-1, random_state=42)
-                elif name == "HistGradientBoosting":
-                    reg = HistGradientBoostingRegressor(**best_params, learning_rate=0.1, max_depth=6, random_state=42)
-                elif name == "XGBoost":
-                    reg = XGBRegressor(**best_params, n_estimators=100, max_depth=6, learning_rate=0.1, n_jobs=-1, random_state=42)
-                elif name == "CatBoost":
-                    reg = CatBoostRegressor(**best_params, iterations=100, depth=6, learning_rate=0.1, verbose=0, random_seed=42, thread_count=-1)
-                else:
-                    reg = Ridge(random_state=42)
-
                 try:
+                    if name == "Ridge":
+                        params = {"alpha": 1.0, **best_params}
+                        reg = Ridge(**params, random_state=42)
+                    elif name == "Random_Forest":
+                        params = {"n_estimators": 100, "max_depth": 8, **best_params}
+                        reg = RandomForestRegressor(**params, n_jobs=-1, random_state=42)
+                    elif name == "HistGradientBoosting":
+                        params = {"learning_rate": 0.1, "max_depth": 6, **best_params}
+                        reg = HistGradientBoostingRegressor(**params, random_state=42)
+                    elif name == "XGBoost":
+                        params = {"n_estimators": 100, "max_depth": 6, "learning_rate": 0.1, **best_params}
+                        reg = XGBRegressor(**params, n_jobs=-1, random_state=42)
+                    elif name == "CatBoost":
+                        params = {"iterations": 100, "depth": 6, "learning_rate": 0.1, "verbose": 0, **best_params}
+                        reg = CatBoostRegressor(**params, random_seed=42, thread_count=-1)
+                    else:
+                        reg = Ridge(random_state=42)
+
                     reg.fit(X_train, y_train)
                     y_val_pred = reg.predict(X_val)
                     val_metrics = calculate_all_metrics(y_val, y_val_pred, task_type="regression")
@@ -431,6 +449,20 @@ def train_and_evaluate(
         log_classification_plots(y_test, y_test_pred, y_test_prob, best_model_name)
         if y_test_prob is not None:
             plot_calibration_curve_to_file(y_test, y_test_prob, best_model_name)
+
+        roc_auc_val = best_test_metrics.get("roc_auc", 0.5)
+        acc_val = best_test_metrics.get("accuracy", 0.0)
+        majority_acc = float(max(np.mean(y_test == 1), np.mean(y_test == 0)))
+
+        if roc_auc_val < 0.5:
+            warn_msg = f"Warning: Holdout classification ROC-AUC ({roc_auc_val:.4f}) is worse than random (0.5000)."
+            print(warn_msg)
+            warnings_list.append(warn_msg)
+
+        if acc_val < majority_acc and len(y_test) >= 20:
+            warn_msg = f"Warning: Holdout accuracy ({acc_val:.2%}) is below majority class baseline ({majority_acc:.2%})."
+            print(warn_msg)
+            warnings_list.append(warn_msg)
     else:
         y_test_pred = best_model_obj.predict(X_test)
         best_test_metrics = calculate_all_metrics(y_test, y_test_pred, task_type="regression")
@@ -441,7 +473,9 @@ def train_and_evaluate(
             print(warn_msg)
             warnings_list.append(warn_msg)
 
-    generate_shap_plots(best_model_obj, X_test[:min(50, len(X_test))], feature_names)
+    _, shap_warn = generate_shap_plots(best_model_obj, X_test[:min(50, len(X_test))], feature_names)
+    if shap_warn:
+        warnings_list.append(shap_warn)
     t_plots = time.perf_counter() - t0_plots
     print(f"[TIME] Diagnostic Plot Generation completed in {t_plots:.2f}s")
 

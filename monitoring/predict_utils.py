@@ -53,6 +53,7 @@ def run_training(
     data_path: str = UPLOAD_PATH,
     target_col: str | None = None,
     fast_mode: bool = True,
+    allow_id_target: bool = False,
     progress_callback: object | None = None,
     **kwargs,
 ) -> dict:
@@ -60,6 +61,7 @@ def run_training(
         data_path=data_path,
         target_col=target_col,
         fast_mode=fast_mode,
+        allow_id_target=allow_id_target,
         progress_callback=progress_callback,
     )
 

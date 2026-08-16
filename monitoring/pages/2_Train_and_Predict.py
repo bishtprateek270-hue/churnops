@@ -22,7 +22,7 @@ from monitoring.predict_utils import (
     save_uploaded_dataset,
     validate_upload,
 )
-from src.preprocessing import find_target_col, infer_task_type
+from src.preprocessing import find_target_col, infer_task_type, is_identifier_column
 
 st.set_page_config(page_title="ChurnOps | Train & Predict", page_icon="🎯", layout="wide")
 
@@ -67,7 +67,17 @@ if uploaded_file is not None:
         )
 
         inferred_task = infer_task_type(df[st.session_state.target_col])
-        st.info(f"💡 Auto-detected Task Type: **{inferred_task.upper()}** for target `{st.session_state.target_col}`.")
+        is_id_target = is_identifier_column(df, st.session_state.target_col)
+        if is_id_target:
+            st.warning(f"⚠️ Column `{st.session_state.target_col}` appears to be a unique row identifier, not a predictable target variable.")
+            allow_id_target = st.checkbox(
+                "I understand and want to train on this identifier column anyway",
+                value=False,
+                key="id_target_chk"
+            )
+        else:
+            allow_id_target = False
+            st.info(f"💡 Auto-detected Task Type: **{inferred_task.upper()}** for target `{st.session_state.target_col}`.")
 
         is_valid, message = validate_upload(df, target_col=st.session_state.target_col)
         if is_valid:
@@ -112,6 +122,11 @@ else:
                 sample_df = pd.read_csv(train_source)
                 selected_target = find_target_col(sample_df)
 
+        allow_id = st.session_state.get("id_target_chk", False)
+        if selected_target and is_identifier_column(pd.read_csv(train_source), selected_target) and not allow_id:
+            st.error(f"⚠️ Training blocked: Column '{selected_target}' is a unique row identifier. Please select a valid target or check the override box.")
+            st.stop()
+
         status_box = st.status("Initializing Training Pipeline...", expanded=True)
         prog_bar = st.progress(0)
 
@@ -124,6 +139,7 @@ else:
                 data_path=train_source,
                 target_col=selected_target,
                 fast_mode=is_fast_mode,
+                allow_id_target=allow_id,
                 progress_callback=streamlit_progress,
             )
             st.session_state.train_result = result
@@ -131,6 +147,7 @@ else:
             status_box.update(label=f"🎉 Training Complete in {result.get('total_time_seconds', 0)}s!", state="complete", expanded=False)
             st.success(f"Training complete in **{result.get('total_time_seconds', 0)}s**! Pipeline saved to `models/unified_pipeline.joblib`.")
         except Exception as exc:
+            st.session_state.train_result = None
             status_box.update(label="⚠️ Training Failed", state="error")
             st.error(f"⚠️ Training failed: {exc}")
 
@@ -192,7 +209,7 @@ if st.session_state.train_result:
             if os.path.exists("reports/plots/shap_summary.png"):
                 st.image("reports/plots/shap_summary.png", caption="SHAP Summary Feature Importance", use_container_width=True)
             else:
-                st.info("SHAP plot was generated during training and logged to MLflow artifacts.")
+                st.warning("⚠️ SHAP feature importance plot unavailable for this run.")
 
         with tab_compare:
             if result.get("model_results"):

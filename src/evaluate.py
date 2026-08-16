@@ -160,6 +160,14 @@ def log_classification_plots(
     os.makedirs(output_dir, exist_ok=True)
     saved_paths = {}
 
+    for fname in ["confusion_matrix.png", "roc_curve.png", "pr_curve.png", "calibration_curve.png"]:
+        p = os.path.join(output_dir, fname)
+        if os.path.exists(p):
+            try:
+                os.remove(p)
+            except Exception as exc:
+                print(f"Notice: Stale plot cleanup note: {exc}")
+
     # 1. Confusion Matrix Plot
     cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
     plt.figure(figsize=(6, 5))
@@ -244,10 +252,18 @@ def generate_shap_plots(
     X_sample: np.ndarray,
     feature_names: list[str],
     output_dir: str = "reports/plots"
-) -> dict[str, str]:
+) -> tuple[dict[str, str], str | None]:
     """Generate SHAP summary plot and feature importance chart."""
     os.makedirs(output_dir, exist_ok=True)
     shap_paths = {}
+    shap_warning = None
+
+    summary_path = os.path.join(output_dir, "shap_summary.png")
+    if os.path.exists(summary_path):
+        try:
+            os.remove(summary_path)
+        except Exception as exc:
+            print(f"Notice: Stale SHAP plot cleanup note: {exc}")
 
     try:
         predict_fn = getattr(model, "predict_proba", getattr(model, "predict", None))
@@ -261,15 +277,15 @@ def generate_shap_plots(
             else:
                 shap.summary_plot(shap_values, X_sample, feature_names=feature_names, show=False)
 
-            summary_path = os.path.join(output_dir, "shap_summary.png")
             plt.tight_layout()
             plt.savefig(summary_path)
             plt.close()
             shap_paths["shap_summary"] = summary_path
     except Exception as e:
-        print(f"Notice: SHAP plot generation skipped or fallback used: {e}")
+        shap_warning = f"SHAP explanation unavailable for this run: {e}"
+        print(f"Notice: {shap_warning}")
 
-    return shap_paths
+    return shap_paths, shap_warning
 
 
 def perform_error_analysis(
