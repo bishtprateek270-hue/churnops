@@ -515,34 +515,6 @@ def train_and_evaluate(
         "fast_mode": fast_mode,
     }
 
-    os.makedirs("models", exist_ok=True)
-    joblib.dump(best_model_obj, "models/best_model.joblib")
-    joblib.dump(full_pipeline, "models/unified_pipeline.joblib")
-    print("Saved unified pipeline artifact to models/unified_pipeline.joblib")
-
-    t_total = time.perf_counter() - t_start
-    print(f"[SUCCESS] TOTAL PIPELINE RUNTIME: {t_total:.2f}s")
-
-    if progress_callback:
-        progress_callback(100, f"Step 5/5: Done in {t_total:.1f}s!")
-
-    primary_score = float(best_test_metrics.get("f1_score", best_test_metrics.get("rmse", 0.0)))
-
-    return {
-        "best_model_name": best_model_name,
-        "task_type": task_type,
-        "optimal_threshold": best_threshold,
-        "best_val_metrics": best_val_metrics,
-        "best_test_metrics": best_test_metrics,
-        "best_f1": primary_score,
-        "business_cost": float(best_business_cost),
-        "model_results": model_results,
-        "best_run_id": best_run_id,
-        "version": registered_model.version,
-        "total_time_seconds": round(t_total, 2),
-        "fast_mode": fast_mode,
-    }
-
 
 if __name__ == "__main__":
     train_and_evaluate(fast_mode=True)
