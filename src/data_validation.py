@@ -66,11 +66,13 @@ class DataValidator:
             raise DataValidationError("Dataset must contain at least one feature column.")
 
     def _check_null_values(self, df: pd.DataFrame):
+        if not self.is_training:
+            return
         total_rows = len(df)
         if total_rows == 0:
             return
 
-        # Ensure no column is 100% empty
+        # Ensure no column is 100% empty during training
         for col in df.columns:
             col_nulls = df[col].replace([np.inf, -np.inf], np.nan).isna().sum()
             if col_nulls == total_rows:
