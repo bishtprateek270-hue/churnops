@@ -148,8 +148,14 @@ def predict_customers(df: pd.DataFrame, model=None, preprocessor=None, threshold
     return results
 
 
-def predict_single_row(row: pd.Series, model=None, preprocessor=None, threshold: float | None = None) -> dict:
-    df = pd.DataFrame([row.to_dict()])
+def predict_single_row(row: pd.Series | dict, model=None, preprocessor=None, threshold: float | None = None) -> dict:
+    if isinstance(row, dict):
+        df = pd.DataFrame([row])
+    elif isinstance(row, pd.Series):
+        df = pd.DataFrame([row.to_dict()])
+    else:
+        df = pd.DataFrame([dict(row)])
     results = predict_customers(df, model=model, preprocessor=preprocessor, threshold=threshold)
     row_result = results.iloc[0]
     return row_result.to_dict()
+
