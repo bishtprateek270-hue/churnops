@@ -219,8 +219,10 @@ def train_and_evaluate(
             f"Please select a valid non-identifier target column or check 'I understand and want to train on this identifier column anyway' to proceed."
         )
 
-    # Filter out rows with missing target values
-    valid_target_mask = df_clean[actual_target].notna() & (~df_clean[actual_target].astype(str).str.strip().str.lower().isin(["nan", "none", "null", "n/a", ""]))
+    # Filter out rows with missing/invalid target values (nan, null, n/a, inf, -inf)
+    invalid_target_terms = {"nan", "none", "null", "n/a", "na", "inf", "-inf", "<na>", ""}
+    target_str_vals = df_clean[actual_target].astype(str).str.strip().str.lower()
+    valid_target_mask = df_clean[actual_target].notna() & (~target_str_vals.isin(invalid_target_terms))
     if not valid_target_mask.all():
         df_clean = df_clean[valid_target_mask].reset_index(drop=True)
 
@@ -321,12 +323,12 @@ def train_and_evaluate(
     else:
         baseline_score = float(np.mean(y_train))
 
-    best_cv_score = -float("inf") if task_type == "classification" else float("inf")
     best_model_name = None
     best_model_obj = None
-    best_run_id = None
+    best_cv_score = -1.0 if task_type == "classification" else float("inf")
     best_threshold = 0.5
     best_val_metrics = {}
+    best_run_id = None
     best_test_metrics = {}
     best_business_cost = 0.0
     model_results = []
@@ -376,16 +378,18 @@ def train_and_evaluate(
                     else:
                         y_val_prob = None
 
-                    opt_th, min_cost, _ = optimize_business_threshold(y_val, y_val_prob, cost_fn=500.0, cost_fp=50.0) if y_val_prob is not None else (0.5, 0.0, {})
-                    y_val_pred = np.where(y_val_prob >= opt_th, 1, 0) if y_val_prob is not None else final_model_obj.predict(X_val)
+                    opt_th, val_cost, _ = optimize_business_threshold(y_val, y_val_prob, cost_fn=500.0, cost_fp=50.0) if y_val_prob is not None else (0.5, 0.0, {})
+                    eval_threshold = opt_th
+                    y_val_pred = np.where(y_val_prob >= eval_threshold, 1, 0) if y_val_prob is not None else final_model_obj.predict(X_val)
                     val_metrics = calculate_all_metrics(y_val, y_val_pred, y_val_prob, task_type="classification")
-
-                    cv_score = val_metrics["pr_auc"] if val_metrics["pr_auc"] > 0 else val_metrics["f1_score"]
+                    
+                    cv_score = val_metrics["roc_auc"]
+                    min_cost = val_cost
                 except Exception as exc:
                     print(f"Notice: Model candidate {name} failed: {exc}")
                     continue
 
-                eval_threshold = opt_th
+                best_threshold = eval_threshold
             else:
                 try:
                     if name == "Ridge":
@@ -411,12 +415,10 @@ def train_and_evaluate(
                     val_metrics = calculate_all_metrics(y_val, y_val_pred, task_type="regression")
                     cv_score = val_metrics["rmse"]
                     final_model_obj = reg
+                    min_cost = 0.0
                 except Exception as exc:
                     print(f"Notice: Model candidate {name} failed: {exc}")
                     continue
-
-                eval_threshold = 0.5
-                min_cost = 0.0
 
             for k, v in best_params.items():
                 mlflow.log_param(k, v)
@@ -437,11 +439,13 @@ def train_and_evaluate(
                 best_model_name = name
                 best_model_obj = final_model_obj
                 best_run_id = run.info.run_id
-                best_threshold = eval_threshold
                 best_val_metrics = val_metrics
 
     t_models = time.perf_counter() - t0_models
     print(f"[TIME] Model Suite Selection completed in {t_models:.2f}s")
+
+    if best_model_obj is None:
+        raise RuntimeError(f"All candidate models failed during training. Results: {model_results}")
 
     if progress_callback:
         progress_callback(75, "Step 3/5: Evaluating winning model ONCE on holdout test set...")
