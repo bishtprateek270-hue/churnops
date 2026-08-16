@@ -209,7 +209,7 @@ def train_and_evaluate(
                 print(f"Notice: Plot cleanup note: {exc}")
 
     df_clean = clean_dataframe(df)
-    actual_target = find_target_col(df_clean, target_col)
+    actual_target = find_target_col(df_clean, target_col, allow_fallback=True)
     if not actual_target or actual_target not in df_clean.columns:
         raise DataValidationError("Target column could not be resolved from dataset.")
 

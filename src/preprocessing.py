@@ -288,7 +288,7 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df_clean
 
 
-def find_target_col(df: pd.DataFrame, target_col: str | None = None) -> str | None:
+def find_target_col(df: pd.DataFrame, target_col: str | None = None, allow_fallback: bool = False) -> str | None:
     """Identify the target column in DataFrame, prioritizing explicit candidates and avoiding true identifiers."""
     if target_col and target_col in df.columns:
         return target_col
@@ -303,12 +303,14 @@ def find_target_col(df: pd.DataFrame, target_col: str | None = None) -> str | No
             if col.lower() == c.lower():
                 return col
 
-    # Fallback: Prefer the last column that is NOT an identifier column
-    non_id_cols = [c for c in df.columns if not is_identifier_column(df, c)]
-    if non_id_cols:
-        return non_id_cols[-1]
+    if allow_fallback:
+        # Fallback: Prefer the last column that is NOT an identifier column
+        non_id_cols = [c for c in df.columns if not is_identifier_column(df, c)]
+        if non_id_cols:
+            return non_id_cols[-1]
+        return df.columns[-1] if len(df.columns) > 0 else None
 
-    return df.columns[-1] if len(df.columns) > 0 else None
+    return None
 
 
 def prepare_data(
