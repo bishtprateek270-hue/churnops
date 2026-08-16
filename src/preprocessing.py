@@ -209,11 +209,14 @@ def build_preprocessor(
     num_cols: list[str] | None = None,
     cat_low_cols: list[str] | None = None,
     cat_high_cols: list[str] | None = None,
+    cat_cols: list[str] | None = None,
 ) -> ColumnTransformer:
     """Build ColumnTransformer for numerical scaling, low-cardinality one-hot encoding, and high-cardinality ordinal encoding."""
     num_cols = num_cols or []
     cat_low_cols = cat_low_cols or []
     cat_high_cols = cat_high_cols or []
+    if cat_cols and not cat_low_cols and not cat_high_cols:
+        cat_low_cols = cat_cols
 
     transformers = []
     if num_cols:
@@ -261,15 +264,26 @@ def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def find_target_col(df: pd.DataFrame, target_col: str | None = None) -> str | None:
-    """Identify the target column in DataFrame."""
+    """Identify the target column in DataFrame, prioritizing explicit candidates and avoiding true identifiers."""
     if target_col and target_col in df.columns:
         return target_col
-    candidates = ["Churn", "churn", "target", "label", "class", "is_churned", "price", "sale_price", "salary"]
+
+    candidates = [
+        "churn", "target", "label", "class", "is_churned", "exited", "survived",
+        "outcome", "response", "price", "sale_price", "saleprice", "salary", "value",
+        "target_class", "target_value"
+    ]
     for c in candidates:
         for col in df.columns:
             if col.lower() == c.lower():
                 return col
-    return None
+
+    # Fallback: Prefer the last column that is NOT an identifier column
+    non_id_cols = [c for c in df.columns if not is_identifier_column(df, c)]
+    if non_id_cols:
+        return non_id_cols[-1]
+
+    return df.columns[-1] if len(df.columns) > 0 else None
 
 
 def prepare_data(

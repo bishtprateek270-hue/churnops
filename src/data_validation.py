@@ -6,7 +6,7 @@ Supports dataset-agnostic schema, target, and null-value validation.
 import numpy as np
 import pandas as pd
 
-from src.preprocessing import is_identifier_column
+from src.preprocessing import find_target_col, is_identifier_column
 
 
 class DataValidationError(Exception):
@@ -52,14 +52,7 @@ class DataValidator:
         return True
 
     def _find_target_column(self, df: pd.DataFrame) -> str | None:
-        if self.target_col and self.target_col in df.columns:
-            return self.target_col
-        candidates = ["Churn", "churn", "target", "label", "class", "is_churned", "price", "sale_price", "salary"]
-        for c in candidates:
-            for col in df.columns:
-                if col.lower() == c.lower():
-                    return col
-        return None
+        return find_target_col(df, target_col=self.target_col)
 
     def _check_schema(self, df: pd.DataFrame, target_name: str | None):
         if self.required_columns:
