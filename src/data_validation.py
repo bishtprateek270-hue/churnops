@@ -103,6 +103,8 @@ class DataValidator:
         valid_targets = df[target_name].replace([np.inf, -np.inf], np.nan).dropna()
         if len(valid_targets) < 2:
             raise DataValidationError(f"Target column '{target_name}' must contain at least 2 non-null observations.")
+        if valid_targets.nunique() <= 1:
+            raise DataValidationError(f"Target column '{target_name}' is constant (only 1 unique value). Training requires target variance.")
 
 
 def validate_data(

@@ -171,13 +171,51 @@ __main__.ChurnFeatureEngineer = GenericFeatureEngineer
 ChurnFeatureEngineer = GenericFeatureEngineer
 
 
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
+
+__all__ = [
+    "ChurnFeatureEngineer",
+    "GenericFeatureEngineer",
+    "build_preprocessor",
+    "clean_dataframe",
+    "detect_identifier_columns",
+    "detect_target_leakage",
+    "find_target_col",
+    "get_feature_names",
+    "infer_task_type",
+    "is_identifier_column",
+    "load_preprocessor",
+    "prepare_data",
+    "save_preprocessor",
+]
+
+
+def detect_target_leakage(df_train: pd.DataFrame, y_train: np.ndarray | None, threshold: float = 0.98) -> list[str]:
+    """Detect columns in training data with near-perfect correlation (> 0.98) to target variable."""
+    leakage_cols = []
+    if y_train is None or len(df_train) == 0:
+        return leakage_cols
+
+    y_series = pd.Series(y_train, index=df_train.index)
+    for col in df_train.columns:
+        if pd.api.types.is_numeric_dtype(df_train[col]):
+            corr = df_train[col].corr(y_series)
+            if not np.isnan(corr) and abs(corr) >= threshold:
+                leakage_cols.append(col)
+
+    return leakage_cols
+
+
 def build_preprocessor(
     num_cols: list[str] | None = None,
-    cat_cols: list[str] | None = None
+    cat_low_cols: list[str] | None = None,
+    cat_high_cols: list[str] | None = None,
 ) -> ColumnTransformer:
-    """Build ColumnTransformer for numerical scaling and categorical one-hot encoding with unknown handling."""
+    """Build ColumnTransformer for numerical scaling, low-cardinality one-hot encoding, and high-cardinality ordinal encoding."""
     num_cols = num_cols or []
-    cat_cols = cat_cols or []
+    cat_low_cols = cat_low_cols or []
+    cat_high_cols = cat_high_cols or []
 
     transformers = []
     if num_cols:
@@ -187,12 +225,19 @@ def build_preprocessor(
         ])
         transformers.append(("num", num_pipeline, num_cols))
 
-    if cat_cols:
-        cat_pipeline = Pipeline([
+    if cat_low_cols:
+        cat_low_pipeline = Pipeline([
             ("imputer", SimpleImputer(strategy="most_frequent")),
             ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
         ])
-        transformers.append(("cat", cat_pipeline, cat_cols))
+        transformers.append(("cat_low", cat_low_pipeline, cat_low_cols))
+
+    if cat_high_cols:
+        cat_high_pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("encoder", OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1))
+        ])
+        transformers.append(("cat_high", cat_high_pipeline, cat_high_cols))
 
     preprocessor = ColumnTransformer(transformers=transformers)
     return preprocessor
@@ -288,15 +333,23 @@ def prepare_data(
 
         X_df = df_clean.drop(columns=drop_cols, errors="ignore")
 
+        leakage_cols = detect_target_leakage(X_df, y)
+        if leakage_cols:
+            X_df = X_df.drop(columns=leakage_cols, errors="ignore")
+
         engineer = GenericFeatureEngineer()
         X_engineered = engineer.transform(X_df)
         num_cols = X_engineered.select_dtypes(include=[np.number]).columns.tolist()
         cat_cols = X_engineered.select_dtypes(exclude=[np.number]).columns.tolist()
 
-        column_trans = build_preprocessor(num_cols=num_cols, cat_cols=cat_cols)
+        cat_low_cols = [c for c in cat_cols if X_engineered[c].nunique() <= 20]
+        cat_high_cols = [c for c in cat_cols if X_engineered[c].nunique() > 20]
+
+        column_trans = build_preprocessor(num_cols=num_cols, cat_low_cols=cat_low_cols, cat_high_cols=cat_high_cols)
         pipeline = Pipeline([
             ("feature_engineer", GenericFeatureEngineer()),
-            ("column_transformer", column_trans)
+            ("column_transformer", column_trans),
+            ("variance_selector", VarianceThreshold(threshold=0.0))
         ])
         pipeline.fit(X_df)
         X_trans = pipeline.transform(X_df)
@@ -304,21 +357,24 @@ def prepare_data(
         preprocessor = pipeline
         preprocessor.feature_cols_ = list(X_df.columns)
         preprocessor.id_cols_ = id_cols
+        preprocessor.leakage_cols_ = leakage_cols
         preprocessor.num_cols_ = num_cols
-        preprocessor.cat_cols_ = cat_cols
+        preprocessor.cat_low_cols_ = cat_low_cols
+        preprocessor.cat_high_cols_ = cat_high_cols
         preprocessor.target_col_ = found_target
         preprocessor.task_type_ = task_type
         preprocessor.feature_names_ = get_feature_names(preprocessor)
     else:
         feature_cols = getattr(preprocessor, "feature_cols_", None)
         id_cols = getattr(preprocessor, "id_cols_", [])
+        leakage_cols = getattr(preprocessor, "leakage_cols_", [])
         stored_target = getattr(preprocessor, "target_col_", None)
 
-        # Drop target and any identifier columns in inference mode
+        # Drop target, ID, and leakage columns in inference mode
         for col in df_clean.columns:
             if ((found_target and col == found_target) or (stored_target and col == stored_target)) and col not in drop_cols:
                 drop_cols.append(col)
-            elif (col in id_cols or is_identifier_column(df_clean, col)) and col not in drop_cols:
+            elif (col in id_cols or col in leakage_cols or is_identifier_column(df_clean, col)) and col not in drop_cols:
                 drop_cols.append(col)
 
         X_df = df_clean.drop(columns=drop_cols, errors="ignore")

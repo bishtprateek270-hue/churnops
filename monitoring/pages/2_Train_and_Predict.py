@@ -149,9 +149,17 @@ if st.session_state.train_result:
             return "N/A"
         return f"{float(val):.4f}"
 
+    warnings = result.get("warnings", [])
+    if warnings:
+        for w in warnings:
+            st.warning(f"⚠️ {w}")
+
     st.markdown(f"### 📊 Training Results (Holdout Test Set): Best Model — **{result['best_model_name'].replace('_', ' ')}**")
     if result.get("total_time_seconds"):
-        st.caption(f"⏱️ Total Training Runtime: **{result['total_time_seconds']} seconds** ({'Fast Baseline Mode' if result.get('fast_mode') else 'Advanced Optuna HPO Mode'})")
+        st.caption(
+            f"⏱️ Runtime: **{result['total_time_seconds']}s** | Baseline Score: **{fmt_num(result.get('baseline_score'))}** | "
+            f"CV Score: **{fmt_num(result.get('cv_score'))}**"
+        )
 
     if task_type == "classification":
         m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
