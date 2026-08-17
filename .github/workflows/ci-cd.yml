@@ -100,13 +100,7 @@ jobs:
           name: model-artifacts
           path: models/
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Build Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: api/Dockerfile
-          push: false
-          tags: churnops-api:latest
+        run: |
+          docker build -t churnops-api:latest -f api/Dockerfile .
+

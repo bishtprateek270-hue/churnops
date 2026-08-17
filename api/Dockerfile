@@ -19,8 +19,8 @@ RUN mkdir -p /app/src /app/api /app/models /app/data /app/mlruns
 COPY src/ /app/src/
 COPY api/ /app/api/
 COPY data/ /app/data/
-COPY models* /app/models/
-COPY mlruns* /app/mlruns/
+COPY models/ /app/models/
+COPY mlruns/ /app/mlruns/
 
 EXPOSE 8000
 
