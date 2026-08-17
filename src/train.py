@@ -254,6 +254,9 @@ def train_and_evaluate(
             unique_str = set(str_vals.unique())
             if any(val in positive_indicators for val in unique_str):
                 y = np.where(str_vals.isin(positive_indicators), 1, 0)
+            elif len(unique_str) == 2:
+                sorted_unique = sorted(list(unique_str))
+                y = np.where(str_vals == sorted_unique[1], 1, 0)
             else:
                 labels, _ = pd.factorize(y_raw)
                 y = np.where(labels < 0, 0, labels)
@@ -361,7 +364,9 @@ def train_and_evaluate(
                     else:
                         base_clf = LogisticRegression(max_iter=1000, random_state=42)
 
-                    use_smote = (len(y_train) >= 20 and np.min(np.bincount(y_train)) >= 2)
+                    pos_ratio = float(np.mean(y_train == 1)) if len(y_train) > 0 else 0.5
+                    is_imbalanced = (pos_ratio < 0.35 or pos_ratio > 0.65)
+                    use_smote = (is_imbalanced and len(y_train) >= 20 and np.min(np.bincount(y_train)) >= 2)
                     if use_smote and name not in ["HistGradientBoosting"]:
                         model_pipeline = ImbPipeline([
                             ("smote", SMOTE(random_state=42)),
@@ -378,7 +383,7 @@ def train_and_evaluate(
                     else:
                         y_val_prob = None
 
-                    opt_th, val_cost, _ = optimize_business_threshold(y_val, y_val_prob, cost_fn=500.0, cost_fp=50.0) if y_val_prob is not None else (0.5, 0.0, {})
+                    opt_th, val_cost, _ = optimize_business_threshold(y_val, y_val_prob, cost_fn=1.0, cost_fp=1.0) if y_val_prob is not None else (0.5, 0.0, {})
                     eval_threshold = opt_th
                     y_val_pred = np.where(y_val_prob >= eval_threshold, 1, 0) if y_val_prob is not None else final_model_obj.predict(X_val)
                     val_metrics = calculate_all_metrics(y_val, y_val_pred, y_val_prob, task_type="classification")
@@ -458,11 +463,10 @@ def train_and_evaluate(
         else:
             y_test_prob = None
 
-        opt_th, best_cost, _ = optimize_business_threshold(y_test, y_test_prob, cost_fn=500.0, cost_fp=50.0) if y_test_prob is not None else (0.5, 0.0, {})
-        best_threshold = opt_th
+        # Evaluate using threshold selected strictly from validation data (never tuned on holdout test set)
         y_test_pred = np.where(y_test_prob >= best_threshold, 1, 0) if y_test_prob is not None else best_model_obj.predict(X_test)
         best_test_metrics = calculate_all_metrics(y_test, y_test_pred, y_test_prob, task_type="classification")
-        best_business_cost = best_cost
+        _, best_business_cost, _ = optimize_business_threshold(y_test, y_test_prob, cost_fn=500.0, cost_fp=50.0) if y_test_prob is not None else (0.5, 0.0, {})
 
         log_classification_plots(y_test, y_test_pred, y_test_prob, best_model_name)
         if y_test_prob is not None:
@@ -473,14 +477,15 @@ def train_and_evaluate(
         majority_acc = float(max(np.mean(y_test == 1), np.mean(y_test == 0)))
 
         if roc_auc_val < 0.5:
-            warn_msg = f"Warning: Holdout classification ROC-AUC ({roc_auc_val:.4f}) is worse than random (0.5000)."
+            warn_msg = f"Warning: Holdout classification ROC-AUC ({roc_auc_val:.4f}) is below 0.50. Model performance is below the majority-class baseline. The dataset may have weak predictive signal."
             print(warn_msg)
             warnings_list.append(warn_msg)
 
         if acc_val < majority_acc and len(y_test) >= 20:
-            warn_msg = f"Warning: Holdout accuracy ({acc_val:.2%}) is below majority class baseline ({majority_acc:.2%})."
+            warn_msg = f"Warning: Holdout accuracy ({acc_val:.2%}) is below majority class baseline ({majority_acc:.2%}). Model performance is below the majority-class baseline. The dataset may have weak predictive signal."
             print(warn_msg)
             warnings_list.append(warn_msg)
+
     else:
         y_test_pred = best_model_obj.predict(X_test)
         best_test_metrics = calculate_all_metrics(y_test, y_test_pred, task_type="regression")

@@ -16,8 +16,9 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 __all__ = [
     "ChurnFeatureEngineer",
@@ -415,8 +416,15 @@ def prepare_data(
         stored_target = getattr(preprocessor, "target_col_", None)
 
         # Drop target, ID, and leakage columns in inference mode
+        # IMPORTANT: Do NOT re-run identifier detection on inference data (small uploads)
+        # Use only the id/leakage lists discovered during training (stored in preprocessor).
         for col in df_clean.columns:
-            if ((found_target and col == found_target) or (stored_target and col == stored_target)) and col not in drop_cols or (col in id_cols or col in leakage_cols or is_identifier_column(df_clean, col)) and col not in drop_cols:
+            if col in drop_cols:
+                continue
+            if (found_target and col == found_target) or (stored_target and col == stored_target):
+                drop_cols.append(col)
+                continue
+            if col in id_cols or col in leakage_cols:
                 drop_cols.append(col)
 
         X_df = df_clean.drop(columns=drop_cols, errors="ignore")
