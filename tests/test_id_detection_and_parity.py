@@ -60,6 +60,10 @@ def test_house_prices_and_telco_churn_id_exclusion():
     house_df = pd.read_csv("data/raw/kaggle_house_prices.csv")
     telco_df = pd.read_csv("data/raw/telco_churn.csv")
 
+    house_target_options = [c for c in house_df.columns if not is_identifier_column(house_df, c)]
+    assert "Id" not in house_target_options
+    assert "SalePrice" in house_target_options
+
     _, _, house_prep, house_names = prepare_data(house_df, fit=True, target_col="SalePrice")
     assert "Id" not in house_prep.feature_cols_
     assert "SalePrice" not in house_prep.feature_cols_

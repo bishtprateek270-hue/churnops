@@ -58,16 +58,18 @@ def is_identifier_column(df: pd.DataFrame, col: str) -> bool:
     # Check if column name strongly indicates an identifier token/suffix
     known_id_names = {
         "id", "id_num", "uuid", "hash", "key", "guid", "index", "rownumber",
-        "row_num", "row_id", "record_id", "customerid", "userid", "transactionid",
-        "houseid", "buildingid", "orderid", "patientid", "accountid", "memberid",
-        "clientid", "subjectid", "itemid", "productid", "sessionid", "sub_id"
+        "row_num", "row_id", "record_id", "customerid", "customer_id", "userid", "user_id",
+        "transactionid", "transaction_id", "houseid", "house_id", "buildingid", "building_id",
+        "orderid", "order_id", "patientid", "patient_id", "accountid", "account_id", "memberid", "member_id",
+        "clientid", "client_id", "subjectid", "subject_id", "itemid", "item_id", "productid", "product_id",
+        "sessionid", "session_id", "sub_id", "serial", "serial_number", "serialnumber", "serial_num"
     }
 
     is_id_name = (
         col_lower in known_id_names
-        or col_lower.endswith(("_id", "-id", "_key", "_uuid", "_hash"))
-        or col_lower.startswith(("id_", "id-", "uuid_"))
-        or bool(re.search(r'(^|_|-|[a-z])(id|uuid|guid|hash|key)s?$', col_lower))
+        or col_lower.endswith(("_id", "-id", "_key", "_uuid", "_hash", "_index", "_serial"))
+        or col_lower.startswith(("id_", "id-", "uuid_", "serial_", "index_"))
+        or bool(re.search(r'(^|_|-|[a-z])(id|uuid|guid|hash|key|index|serial)s?$', col_lower))
     )
 
     # Monotonicity check for numerical series

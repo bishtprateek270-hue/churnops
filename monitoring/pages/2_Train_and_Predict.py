@@ -56,7 +56,9 @@ if uploaded_file is not None:
         st.dataframe(df.head(10), use_container_width=True)
 
         detected_target = find_target_col(df)
-        target_options = list(df.columns)
+        target_options = [c for c in df.columns if not is_identifier_column(df, c)]
+        if not target_options:
+            target_options = list(df.columns)
         default_idx = target_options.index(detected_target) if detected_target in target_options else 0
 
         st.session_state.target_col = st.selectbox(
