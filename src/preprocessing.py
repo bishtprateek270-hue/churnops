@@ -15,10 +15,10 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
 from sklearn.feature_selection import VarianceThreshold
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
+from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 
 __all__ = [
     "ChurnFeatureEngineer",
@@ -195,8 +195,6 @@ __main__.ChurnFeatureEngineer = GenericFeatureEngineer
 ChurnFeatureEngineer = GenericFeatureEngineer
 
 
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.preprocessing import OrdinalEncoder
 
 __all__ = [
     "ChurnFeatureEngineer",

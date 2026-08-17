@@ -255,7 +255,7 @@ def train_and_evaluate(
             if any(val in positive_indicators for val in unique_str):
                 y = np.where(str_vals.isin(positive_indicators), 1, 0)
             elif len(unique_str) == 2:
-                sorted_unique = sorted(list(unique_str))
+                sorted_unique = sorted(unique_str)
                 y = np.where(str_vals == sorted_unique[1], 1, 0)
             else:
                 labels, _ = pd.factorize(y_raw)
