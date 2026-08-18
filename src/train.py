@@ -394,7 +394,6 @@ def train_and_evaluate(
                     print(f"Notice: Model candidate {name} failed: {exc}")
                     continue
 
-                best_threshold = eval_threshold
             else:
                 try:
                     if name == "Ridge":
@@ -445,6 +444,8 @@ def train_and_evaluate(
                 best_model_obj = final_model_obj
                 best_run_id = run.info.run_id
                 best_val_metrics = val_metrics
+                if task_type == "classification":
+                    best_threshold = eval_threshold
 
     t_models = time.perf_counter() - t0_models
     print(f"[TIME] Model Suite Selection completed in {t_models:.2f}s")
