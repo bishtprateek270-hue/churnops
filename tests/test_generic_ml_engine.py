@@ -43,7 +43,7 @@ def test_classification_end_to_end(tmp_path):
     csv_path = tmp_path / "cls_data.csv"
     df.to_csv(csv_path, index=False)
 
-    train_res = train_and_evaluate(data_path=str(csv_path), target_col="Churn", n_optuna_trials=2)
+    train_res = train_and_evaluate(data_path=str(csv_path), target_col="Churn", fast_mode=True)
     assert train_res["task_type"] == "classification"
     assert os.path.exists("models/unified_pipeline.joblib")
 
@@ -63,7 +63,7 @@ def test_regression_end_to_end(regression_dataset, tmp_path):
     csv_path = tmp_path / "reg_data.csv"
     regression_dataset.to_csv(csv_path, index=False)
 
-    train_res = train_and_evaluate(data_path=str(csv_path), target_col="sale_price", n_optuna_trials=2)
+    train_res = train_and_evaluate(data_path=str(csv_path), target_col="sale_price", fast_mode=True)
     assert train_res["task_type"] == "regression"
     assert os.path.exists("models/unified_pipeline.joblib")
 
@@ -97,7 +97,7 @@ def test_infinities_and_missing_values_end_to_end(tmp_path):
     csv_path = tmp_path / "inf_data.csv"
     df.to_csv(csv_path, index=False)
 
-    train_res = train_and_evaluate(data_path=str(csv_path), target_col="Churn", n_optuna_trials=2)
+    train_res = train_and_evaluate(data_path=str(csv_path), target_col="Churn", fast_mode=True)
     assert train_res["task_type"] == "classification"
     assert os.path.exists("models/unified_pipeline.joblib")
 

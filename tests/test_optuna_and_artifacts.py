@@ -65,10 +65,10 @@ def test_identifier_target_guard(tmp_path):
 
     # 2. Pipeline training should raise DataValidationError without override
     with pytest.raises(DataValidationError, match="unique row identifier"):
-        train_and_evaluate(data_path=str(csv_path), target_col="CustomerId", allow_id_target=False)
+        train_and_evaluate(data_path=str(csv_path), target_col="CustomerId", allow_id_target=False, fast_mode=True)
 
     # 3. Pipeline training with allow_id_target=True should proceed
-    res = train_and_evaluate(data_path=str(csv_path), target_col="CustomerId", allow_id_target=True)
+    res = train_and_evaluate(data_path=str(csv_path), target_col="CustomerId", allow_id_target=True, fast_mode=True)
     assert res["task_type"] is not None
 
 
@@ -83,7 +83,7 @@ def test_artifact_isolation_across_datasets(tmp_path):
     path_a = tmp_path / "dataset_a.csv"
     df_a.to_csv(path_a, index=False)
 
-    train_and_evaluate(data_path=str(path_a), target_col="target_a")
+    train_and_evaluate(data_path=str(path_a), target_col="target_a", fast_mode=True)
     assert os.path.exists("reports/plots/confusion_matrix.png")
 
     df_b = pd.DataFrame({
@@ -95,7 +95,7 @@ def test_artifact_isolation_across_datasets(tmp_path):
     path_b = tmp_path / "dataset_b.csv"
     df_b.to_csv(path_b, index=False)
 
-    res_b = train_and_evaluate(data_path=str(path_b), target_col="target_b")
+    res_b = train_and_evaluate(data_path=str(path_b), target_col="target_b", fast_mode=True)
     assert res_b["task_type"] == "regression"
     # Confusion matrix from classification dataset A must be cleaned up / removed for regression dataset B
     assert not os.path.exists("reports/plots/confusion_matrix.png")

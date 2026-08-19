@@ -17,8 +17,6 @@ import pandas as pd
 import __main__
 import src.preprocessing
 
-importlib.reload(src.preprocessing)
-
 from src.data_validation import DataValidationError, validate_data
 from src.preprocessing import GenericFeatureEngineer, find_target_col, load_preprocessor, prepare_data
 from src.train import train_and_evaluate

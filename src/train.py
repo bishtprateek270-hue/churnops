@@ -360,7 +360,7 @@ def train_and_evaluate(
                         base_clf = XGBClassifier(**params, n_jobs=-1, random_state=42)
                     elif name == "CatBoost":
                         params = {"iterations": 100, "depth": 6, "learning_rate": 0.1, "verbose": 0, **best_params}
-                        base_clf = CatBoostClassifier(**params, random_seed=42, thread_count=-1)
+                        base_clf = CatBoostClassifier(**params, random_seed=42, thread_count=2)
                     else:
                         base_clf = LogisticRegression(max_iter=1000, random_state=42)
 

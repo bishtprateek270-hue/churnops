@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: churnops-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=file:/app/mlruns
+      - PREDICTIONS_DB_PATH=/app/monitoring/predictions.db
+    volumes:
+      - ./monitoring:/app/monitoring
+      - ./models:/app/models
+      - ./mlruns:/app/mlruns
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: churnops-dashboard
+    command: streamlit run monitoring/dashboard.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - MLFLOW_TRACKING_URI=file:/app/mlruns
+      - PREDICTIONS_DB_PATH=/app/monitoring/predictions.db
+    volumes:
+      - ./monitoring:/app/monitoring
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./mlruns:/app/mlruns
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: churnops-mlflow
+    command: mlflow ui --host 0.0.0.0 --port 5000 --backend-store-uri file:/app/mlruns
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/app/mlruns
+    restart: unless-stopped

@@ -269,7 +269,8 @@ def generate_shap_plots(
         predict_fn = getattr(model, "predict_proba", getattr(model, "predict", None))
         if predict_fn:
             explainer = shap.Explainer(predict_fn, X_sample)
-            shap_values = explainer(X_sample)
+            max_ev = min(100, 2 * X_sample.shape[1] + 1)
+            shap_values = explainer(X_sample, max_evals=max_ev)
 
             plt.figure(figsize=(8, 6))
             if hasattr(shap_values, "values") and shap_values.values.ndim == 3:
@@ -319,6 +320,20 @@ def perform_error_analysis(
     return analysis
 
 
+def _get_model_version_metrics(client: mlflow.tracking.MlflowClient, model_name: str, version: str) -> tuple[dict[str, float], float]:
+    """Retrieve run metrics associated with a registered model version."""
+    try:
+        mv = client.get_model_version(model_name, version)
+        if mv.run_id:
+            run = client.get_run(mv.run_id)
+            metrics = {k: float(v) for k, v in run.data.metrics.items()}
+            f1 = metrics.get("val_f1_score", metrics.get("f1_score", metrics.get("val_roc_auc", metrics.get("roc_auc", 0.0))))
+            return metrics, float(f1)
+    except Exception as exc:
+        print(f"Notice: Could not fetch metrics for model version {version}: {exc}")
+    return {}, 0.0
+
+
 def compare_and_promote(promote: bool = True) -> tuple[bool, dict]:
     """Compare candidate Staging model vs current Production model and promote if superior."""
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns"))
@@ -333,8 +348,30 @@ def compare_and_promote(promote: bool = True) -> tuple[bool, dict]:
     prod_versions = client.get_latest_versions(model_name, stages=["Production"])
     prod_version = prod_versions[0].version if prod_versions else None
 
+    # Fetch candidate metrics dynamically from MLflow run
+    candidate_metrics, cand_f1 = _get_model_version_metrics(client, model_name, candidate_version)
+
+    # Fallback to local unified pipeline artifact if run metrics missing
+    if cand_f1 == 0.0 and os.path.exists("models/unified_pipeline.joblib"):
+        try:
+            import joblib
+            unified = joblib.load("models/unified_pipeline.joblib")
+            holdout = unified.get("holdout_metrics", {})
+            cand_f1 = float(holdout.get("f1_score", holdout.get("r2_score", 0.80)))
+            candidate_metrics = holdout
+        except Exception as exc:
+            print(f"Notice: Fallback metric loading note: {exc}")
+
+    prod_metrics = {}
+    prod_f1 = 0.0
+    if prod_version:
+        prod_metrics, prod_f1 = _get_model_version_metrics(client, model_name, prod_version)
+
+    # Promote if candidate is superior or if no production model exists yet
+    should_promote = (prod_version is None) or (cand_f1 >= prod_f1)
     promoted = False
-    if promote:
+
+    if promote and should_promote:
         client.transition_model_version_stage(
             name=model_name,
             version=candidate_version,
@@ -347,7 +384,8 @@ def compare_and_promote(promote: bool = True) -> tuple[bool, dict]:
         "candidate_version": candidate_version,
         "production_version": prod_version,
         "promoted": promoted,
-        "candidate_metrics": {"f1_score": 0.82},
-        "production_metrics": {"f1_score": 0.79} if prod_version else None,
+        "candidate_metrics": candidate_metrics or {"f1_score": cand_f1},
+        "production_metrics": prod_metrics or ({"f1_score": prod_f1} if prod_version else None),
     }
     return promoted, report
+

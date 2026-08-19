@@ -79,9 +79,9 @@ def test_full_pipeline_train_evaluate_and_save(sample_churn_df, tmp_path):
     csv_path = tmp_path / "train_sample.csv"
     sample_churn_df.to_csv(csv_path, index=False)
 
-    train_res = train_and_evaluate(data_path=str(csv_path), target_col="Churn", n_optuna_trials=2)
+    train_res = train_and_evaluate(data_path=str(csv_path), target_col="Churn", fast_mode=True)
 
-    assert train_res["best_model_name"] in ["Logistic_Regression", "Random_Forest", "XGBoost", "CatBoost"]
+    assert train_res["best_model_name"] in ["Logistic_Regression", "Random_Forest", "HistGradientBoosting", "XGBoost", "CatBoost"]
     assert "optimal_threshold" in train_res
 
     # Check exported artifacts

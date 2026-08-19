@@ -1,0 +1,16 @@
+.git
+.gitignore
+.github
+.pytest_cache
+.ruff_cache
+catboost_info
+scratch
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.md
+.dvc
+.dvcignore
+dvc.lock
+dvc.yaml

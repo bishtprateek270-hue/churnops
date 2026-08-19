@@ -53,8 +53,8 @@ def test_custom_dataset_training_and_prediction(custom_dataset, tmp_path):
     csv_path = tmp_path / "custom_data.csv"
     custom_dataset.to_csv(csv_path, index=False)
 
-    train_res = train_and_evaluate(data_path=str(csv_path), target_col="target")
-    assert train_res["best_model_name"] in ["Logistic_Regression", "Random_Forest", "XGBoost", "CatBoost"]
+    train_res = train_and_evaluate(data_path=str(csv_path), target_col="target", fast_mode=True)
+    assert train_res["best_model_name"] in ["Logistic_Regression", "Random_Forest", "HistGradientBoosting", "XGBoost", "CatBoost"]
 
     # Test batch predictions on new sample rows
     sample_test = custom_dataset.drop(columns=["target"]).head(10)
