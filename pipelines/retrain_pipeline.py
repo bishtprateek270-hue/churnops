@@ -20,7 +20,7 @@ from src.train import train_and_evaluate
 
 def run_retraining_pipeline():
     print("=== Starting ChurnOps Automated Retraining Pipeline ===")
-    
+
     # 1. Fetch / Generate Data
     data_path = "data/raw/telco_churn.csv"
     if not os.path.exists(data_path):
@@ -44,7 +44,7 @@ def run_retraining_pipeline():
     # 3. Evaluate against current Production model and promote if superior
     print("\n--- Evaluating Candidate Model against Production ---")
     promoted, report = compare_and_promote(promote=True)
-    
+
     print("\n=== Retraining Pipeline Summary ===")
     if "error" in report:
         print(f"Promotion Status: {report['error']}")

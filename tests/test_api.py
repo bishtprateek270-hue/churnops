@@ -21,7 +21,7 @@ def setup_mock_model_and_db(tmp_path):
     # Fit real preprocessor on sample data
     df = generate_telco_churn_data(num_samples=20, seed=789)
     _, _, preprocessor, _ = prepare_data(df, fit=True)
-    
+
     # Mock model
     mock_model = MagicMock()
     mock_model.predict_proba.return_value = np.array([[0.25, 0.75]])

@@ -2,9 +2,8 @@
 Pydantic schemas for FastAPI serving layer input/output validation.
 """
 
+
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional
-from datetime import datetime
 
 
 class ChurnInput(BaseModel):
@@ -84,12 +83,12 @@ class ChurnOutput(BaseModel):
     churn_probability: float = Field(..., description="Probability of customer churning")
     model_version: str = Field(..., description="MLflow model version used for inference")
     timestamp: str = Field(..., description="ISO timestamp of prediction request")
-    request_id: Optional[str] = Field(None, description="Unique request identifier for tracing")
-    processing_time_ms: Optional[float] = Field(None, description="Processing time in milliseconds")
+    request_id: str | None = Field(None, description="Unique request identifier for tracing")
+    processing_time_ms: float | None = Field(None, description="Processing time in milliseconds")
 
 
 class BatchChurnInput(BaseModel):
-    customers: List[ChurnInput] = Field(..., min_length=1, max_length=100, description="List of customer records to predict")
+    customers: list[ChurnInput] = Field(..., min_length=1, max_length=100, description="List of customer records to predict")
 
 
 class BatchChurnResult(BaseModel):
@@ -105,14 +104,14 @@ class BatchChurnError(BaseModel):
 
 
 class BatchChurnOutput(BaseModel):
-    results: List[BatchChurnResult] = Field(..., description="Successful predictions")
-    errors: List[BatchChurnError] = Field(default_factory=list, description="Failed predictions")
+    results: list[BatchChurnResult] = Field(..., description="Successful predictions")
+    errors: list[BatchChurnError] = Field(default_factory=list, description="Failed predictions")
     total_processed: int = Field(..., description="Number of successfully processed customers")
     total_errors: int = Field(..., description="Number of failed predictions")
     model_version: str = Field(..., description="MLflow model version used for inference")
     timestamp: str = Field(..., description="ISO timestamp of prediction request")
-    request_id: Optional[str] = Field(None, description="Unique request identifier for tracing")
-    processing_time_ms: Optional[float] = Field(None, description="Processing time in milliseconds")
+    request_id: str | None = Field(None, description="Unique request identifier for tracing")
+    processing_time_ms: float | None = Field(None, description="Processing time in milliseconds")
 
 
 class HealthResponse(BaseModel):
@@ -120,7 +119,7 @@ class HealthResponse(BaseModel):
     model_name: str = Field(..., description="Registered model name")
     model_stage: str = Field(..., description="MLflow stage loaded (e.g., 'Production' or 'Staging')")
     model_version: str = Field(..., description="Version of model loaded")
-    model_loaded_at: Optional[str] = Field(None, description="ISO timestamp when model was loaded")
+    model_loaded_at: str | None = Field(None, description="ISO timestamp when model was loaded")
     preprocessor_loaded: bool = Field(..., description="Whether preprocessor is loaded")
     timestamp: str = Field(..., description="Current server ISO timestamp")
 
@@ -128,5 +127,5 @@ class HealthResponse(BaseModel):
 class ErrorResponse(BaseModel):
     detail: str = Field(..., description="Error message")
     error_type: str = Field(..., description="Type of error")
-    request_id: Optional[str] = Field(None, description="Request identifier for tracing")
+    request_id: str | None = Field(None, description="Request identifier for tracing")
     timestamp: str = Field(..., description="ISO timestamp of error")

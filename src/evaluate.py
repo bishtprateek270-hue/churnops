@@ -109,7 +109,7 @@ def optimize_business_threshold(
     num_thresholds: int = 100
 ) -> tuple[float, float, dict]:
     """Optimize probability decision threshold to maximize F1 score while minimizing business cost.
-    
+
     cost_fn: Cost of false negative (e.g. losing customer)
     cost_fp: Cost of false positive (e.g. unnecessary retention offer)
     """

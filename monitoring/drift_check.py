@@ -31,7 +31,7 @@ def calculate_psi_numerical(expected: np.ndarray, actual: np.ndarray, num_bins: 
     percentiles = np.linspace(0, 100, num_bins + 1)
     bins = np.percentile(expected, percentiles)
     bins = np.unique(bins)  # Deduplicate identical quantiles
-    
+
     if len(bins) < 2:
         return 0.0
 
@@ -56,7 +56,7 @@ def calculate_psi_numerical(expected: np.ndarray, actual: np.ndarray, num_bins: 
 def calculate_psi_categorical(expected: pd.Series, actual: pd.Series) -> float:
     """Calculate PSI for discrete categorical variables."""
     all_categories = set(expected.unique()).union(set(actual.unique()))
-    
+
     expected_vc = expected.value_counts(normalize=True)
     actual_vc = actual.value_counts(normalize=True)
 
@@ -66,7 +66,7 @@ def calculate_psi_categorical(expected: pd.Series, actual: pd.Series) -> float:
         exp_pct = expected_vc.get(cat, eps)
         act_pct = actual_vc.get(cat, eps)
         psi += (act_pct - exp_pct) * np.log(act_pct / exp_pct)
-        
+
     return float(psi)
 
 
@@ -120,7 +120,7 @@ def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH
         if col in df_ref.columns and col in df_act.columns:
             exp_vals = pd.to_numeric(df_ref[col], errors="coerce").values
             act_vals = pd.to_numeric(df_act[col], errors="coerce").values
-            
+
             psi = calculate_psi_numerical(exp_vals, act_vals)
             ks_stat, ks_pval = compute_ks_test(exp_vals, act_vals)
 
@@ -145,7 +145,7 @@ def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH
     for col in cat_cols:
         if col in df_ref.columns and col in df_act.columns:
             psi = calculate_psi_categorical(df_ref[col], df_act[col])
-            
+
             if psi > 0.25:
                 status_str = "CRITICAL DRIFT"
                 drift_detected = True

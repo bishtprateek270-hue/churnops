@@ -6,6 +6,8 @@ Supports both Classification and Regression tasks with robust missing value and 
 import os
 import sys
 
+import __main__
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import re
@@ -190,29 +192,9 @@ class GenericFeatureEngineer(BaseEstimator, TransformerMixin):
         return X_out
 
 
-import __main__
-
 __main__.GenericFeatureEngineer = GenericFeatureEngineer
 __main__.ChurnFeatureEngineer = GenericFeatureEngineer
 ChurnFeatureEngineer = GenericFeatureEngineer
-
-
-
-__all__ = [
-    "ChurnFeatureEngineer",
-    "GenericFeatureEngineer",
-    "build_preprocessor",
-    "clean_dataframe",
-    "detect_identifier_columns",
-    "detect_target_leakage",
-    "find_target_col",
-    "get_feature_names",
-    "infer_task_type",
-    "is_identifier_column",
-    "load_preprocessor",
-    "prepare_data",
-    "save_preprocessor",
-]
 
 
 def detect_target_leakage(df_train: pd.DataFrame, y_train: np.ndarray | None, threshold: float = 0.98) -> list[str]:
@@ -459,7 +441,7 @@ def get_feature_names(preprocessor: object) -> list[str]:
         col_trans = preprocessor.named_steps.get("column_transformer", preprocessor)
 
     if hasattr(col_trans, "transformers_"):
-        for name, trans, cols in col_trans.transformers_:
+        for _name, trans, cols in col_trans.transformers_:
             if trans == "drop" or trans is None:
                 continue
             if hasattr(trans, "get_feature_names_out"):

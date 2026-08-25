@@ -387,7 +387,7 @@ def train_and_evaluate(
                     eval_threshold = opt_th
                     y_val_pred = np.where(y_val_prob >= eval_threshold, 1, 0) if y_val_prob is not None else final_model_obj.predict(X_val)
                     val_metrics = calculate_all_metrics(y_val, y_val_pred, y_val_prob, task_type="classification")
-                    
+
                     cv_score = val_metrics["roc_auc"]
                     min_cost = val_cost
                 except Exception as exc:

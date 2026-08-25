@@ -19,7 +19,7 @@ def sample_data():
 def test_prepare_data_fit_and_transform(sample_data):
     """Test fitting and transforming dataset yields non-empty numpy arrays without NaNs."""
     X_trans, y, _preprocessor, feature_names = prepare_data(sample_data, fit=True)
-    
+
     assert isinstance(X_trans, np.ndarray)
     assert X_trans.shape[0] == 100
     assert X_trans.shape[1] > 15  # Expanded one-hot columns
@@ -44,7 +44,7 @@ def test_preprocessor_save_and_load(sample_data, tmp_path):
     """Test saving preprocessor to disk and loading it back."""
     _, _, preprocessor, _ = prepare_data(sample_data, fit=True)
     save_path = os.path.join(tmp_path, "test_preprocessor.joblib")
-    
+
     save_preprocessor(preprocessor, save_path)
     assert os.path.exists(save_path)
 

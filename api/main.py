@@ -2,14 +2,13 @@
 FastAPI Serving API for ChurnOps customer churn prediction.
 """
 
+import logging
 import os
 import sys
-import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Optional
 
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 
@@ -17,17 +16,17 @@ os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import sqlite3
+
 import joblib
 import mlflow
 import mlflow.pyfunc
 import pandas as pd
-from fastapi import FastAPI, HTTPException, status, Request, Response, Depends
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
-from pydantic import BaseModel, Field
 
-from api.schemas import ChurnInput, ChurnOutput, HealthResponse, BatchChurnInput, BatchChurnOutput
+from api.schemas import BatchChurnInput, BatchChurnOutput, ChurnInput, ChurnOutput, HealthResponse
 from src.data_validation import DataValidationError, validate_data
 from src.preprocessing import load_preprocessor, prepare_data
 
@@ -101,9 +100,9 @@ def init_sqlite_db():
 
 
 def log_prediction_to_db(
-    input_dict: dict, 
-    prediction: int, 
-    probability: float, 
+    input_dict: dict,
+    prediction: int,
+    probability: float,
     model_version: str,
     request_id: str,
     processing_time_ms: float
@@ -113,14 +112,14 @@ def log_prediction_to_db(
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         now_iso = datetime.now(timezone.utc).isoformat()
-        
+
         cursor.execute("""
             INSERT INTO predictions (
                 request_id, timestamp, gender, SeniorCitizen, Partner, Dependents, tenure,
                 PhoneService, MultipleLines, InternetService, OnlineSecurity,
                 OnlineBackup, DeviceProtection, TechSupport, StreamingTV,
                 StreamingMovies, Contract, PaperlessBilling, PaymentMethod,
-                MonthlyCharges, TotalCharges, churn_prediction, churn_probability, 
+                MonthlyCharges, TotalCharges, churn_prediction, churn_probability,
                 model_version, processing_time_ms
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -160,7 +159,7 @@ def log_prediction_to_db(
 def load_model_and_preprocessor():
     """Load model from MLflow Registry ('Production' or 'Staging') or fallback local file."""
     start_time = time.time()
-    
+
     # 1. Load preprocessor
     try:
         model_store["preprocessor"] = load_preprocessor("models/preprocessor.joblib")
@@ -202,23 +201,24 @@ def load_model_and_preprocessor():
 
 def check_rate_limit(request: Request):
     """Simple in-memory rate limiting (use Redis in production)."""
+    global request_counts
     client_ip = request.client.host
     now = time.time()
-    
+
     # Clean old entries
     request_counts = {k: v for k, v in request_counts.items() if v > now - 60}
-    
+
     if client_ip in request_counts:
         if request_counts[client_ip] >= RATE_LIMIT_PER_MINUTE:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Rate limit exceeded. Please try again later."
             )
-    
+
     request_counts[client_ip] = request_counts.get(client_ip, 0) + 1
 
 
-async def get_api_key(api_key: Optional[str] = Depends(APIKeyHeader)):
+async def get_api_key(api_key: str | None = Depends(APIKeyHeader)):
     """Validate API key if authentication is enabled."""
     if os.getenv("ENABLE_AUTH", "false").lower() == "true":
         if not api_key:
@@ -275,16 +275,16 @@ async def add_request_id(request: Request, call_next):
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
     start_time = time.time()
-    
+
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
-    
+
     # Log request
     process_time = time.time() - start_time
     logger.info(
         f"{request.method} {request.url.path} - Status: {response.status_code} - Time: {process_time:.3f}s - RequestID: {request_id}"
     )
-    
+
     return response
 
 
@@ -293,7 +293,7 @@ def health_check():
     """Health check endpoint with detailed model status."""
     model_loaded = model_store["model"] is not None
     preprocessor_loaded = model_store["preprocessor"] is not None
-    
+
     return HealthResponse(
         status="healthy" if model_loaded else "degraded",
         model_name=MODEL_NAME,
@@ -322,10 +322,10 @@ async def predict_churn(payload: ChurnInput, request: Request):
     """Single customer churn prediction endpoint."""
     start_time = time.time()
     request_id = request.state.request_id
-    
+
     # Check rate limit
     check_rate_limit(request)
-    
+
     if model_store["model"] is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -342,9 +342,9 @@ async def predict_churn(payload: ChurnInput, request: Request):
     except DataValidationError as e:
         logger.warning(f"Data validation failed for request {request_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
-        )
+        ) from e
 
     # Transform features
     try:
@@ -355,9 +355,9 @@ async def predict_churn(payload: ChurnInput, request: Request):
     except Exception as e:
         logger.error(f"Preprocessing error for request {request_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Preprocessing error: {str(e)}"
-        )
+        ) from e
 
     # Predict
     try:
@@ -374,9 +374,9 @@ async def predict_churn(payload: ChurnInput, request: Request):
     except Exception as e:
         logger.error(f"Inference error for request {request_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Inference error: {str(e)}"
-        )
+        ) from e
 
     label = "Yes" if pred_class == 1 else "No"
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -405,13 +405,13 @@ async def predict_churn_batch(payload: BatchChurnInput, request: Request):
     """Batch customer churn prediction endpoint (max 100 records)."""
     start_time = time.time()
     request_id = request.state.request_id
-    
+
     if len(payload.customers) > 100:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Batch size exceeds maximum of 100 customers"
         )
-    
+
     if model_store["model"] is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -420,21 +420,21 @@ async def predict_churn_batch(payload: BatchChurnInput, request: Request):
 
     results = []
     errors = []
-    
+
     for idx, customer in enumerate(payload.customers):
         try:
             input_dict = customer.model_dump()
             df_input = pd.DataFrame([input_dict])
-            
+
             # Validate
             validate_data(df_input, is_training=False)
-            
+
             # Transform
             if model_store["preprocessor"] is not None:
                 X_trans, _, _, _ = prepare_data(df_input, preprocessor=model_store["preprocessor"], fit=False)
             else:
                 raise RuntimeError("Preprocessor not loaded.")
-            
+
             # Predict
             model = model_store["model"]
             if hasattr(model, "predict_proba"):
@@ -445,7 +445,7 @@ async def predict_churn_batch(payload: BatchChurnInput, request: Request):
                 preds = model.predict(X_trans)
                 prob = float(preds[0]) if preds.ndim == 1 else float(preds[0, 1])
                 pred_class = int(prob > 0.5)
-            
+
             label = "Yes" if pred_class == 1 else "No"
             results.append({
                 "index": idx,
@@ -453,21 +453,21 @@ async def predict_churn_batch(payload: BatchChurnInput, request: Request):
                 "churn_label": label,
                 "churn_probability": round(prob, 4)
             })
-            
+
             # Log to DB
             log_prediction_to_db(
-                input_dict, pred_class, prob, model_store["version"], 
+                input_dict, pred_class, prob, model_store["version"],
                 f"{request_id}_{idx}", (time.time() - start_time) * 1000
             )
-            
+
         except Exception as e:
             errors.append({
                 "index": idx,
                 "error": str(e)
             })
-    
+
     processing_time_ms = (time.time() - start_time) * 1000
-    
+
     return BatchChurnOutput(
         results=results,
         errors=errors,

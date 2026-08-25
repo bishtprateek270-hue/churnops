@@ -1,18 +1,14 @@
+import importlib
 import os
 import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-
-import importlib
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 
 import monitoring.predict_utils
-
-importlib.reload(monitoring.predict_utils)
-
 from monitoring.predict_utils import (
     UPLOAD_PATH,
     load_trained_artifacts,
@@ -23,6 +19,8 @@ from monitoring.predict_utils import (
     validate_upload,
 )
 from src.preprocessing import find_target_col, infer_task_type, is_identifier_column
+
+importlib.reload(monitoring.predict_utils)
 
 st.set_page_config(page_title="ChurnOps | Train & Predict", page_icon="🎯", layout="wide")
 
@@ -305,13 +303,13 @@ with predict_tab_batch:
 
 with predict_tab_form:
     st.markdown("Enter feature values manually:")
-    
+
     feature_cols = getattr(preprocessor, "feature_cols_", [])
-    
+
     with st.form("manual_predict_form"):
         form_inputs = {}
         cols = st.columns(3)
-        
+
         for col_idx, col_name in enumerate(feature_cols):
             with cols[col_idx % 3]:
                 is_num = False
