@@ -11,6 +11,12 @@ services:
     environment:
       - MLFLOW_TRACKING_URI=file:/app/mlruns
       - PREDICTIONS_DB_PATH=/app/monitoring/predictions.db
+      - ENABLE_AUTH=${ENABLE_AUTH:-false}
+      - API_KEY_SECRET=${API_KEY_SECRET:-}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-100}
+      - ENABLE_CORS=${ENABLE_CORS:-true}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./monitoring:/app/monitoring
       - ./models:/app/models
@@ -21,6 +27,11 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+      start_period: 10s
+    depends_on:
+      - mlflow
+    networks:
+      - churnops-network
 
   dashboard:
     build:
@@ -33,6 +44,7 @@ services:
     environment:
       - MLFLOW_TRACKING_URI=file:/app/mlruns
       - PREDICTIONS_DB_PATH=/app/monitoring/predictions.db
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./monitoring:/app/monitoring
       - ./data:/app/data
@@ -41,6 +53,8 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+    networks:
+      - churnops-network
 
   mlflow:
     build:
@@ -53,3 +67,9 @@ services:
     volumes:
       - ./mlruns:/app/mlruns
     restart: unless-stopped
+    networks:
+      - churnops-network
+
+networks:
+  churnops-network:
+    driver: bridge

@@ -51,3 +51,4 @@ catboost_info/
 .idea/
 .DS_Store
 Thumbs.db
+.aider*

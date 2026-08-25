@@ -74,6 +74,8 @@ churnops/
 ├── .dockerignore                  # Docker build context optimization rules
 ├── dvc.yaml                       # DVC pipeline declaration
 ├── requirements.txt               # Pinned Python dependencies
+├── pyproject.toml                 # Project configuration and tool settings
+├── .env.example                   # Environment variables template
 └── README.md                      # Documentation
 ```
 
@@ -90,6 +92,32 @@ docker-compose up --build -d
 - 🚀 **FastAPI Prediction API**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - 📊 **Streamlit Monitoring Dashboard**: [http://localhost:8501](http://localhost:8501)
 - 🧪 **MLflow Tracking UI**: [http://localhost:5000](http://localhost:5000)
+
+---
+
+## 🔐 Security & Configuration
+
+### Environment Variables
+
+Create a `.env` file in the root directory:
+
+```bash
+# API Configuration
+ENABLE_AUTH=false                    # Enable API key authentication
+API_KEY_SECRET=your-secret-key       # Required if ENABLE_AUTH=true
+RATE_LIMIT_PER_MINUTE=100            # Rate limit per IP
+ENABLE_CORS=true                     # Enable CORS
+CORS_ORIGINS=*                       # Comma-separated allowed origins
+
+# MLflow Configuration
+MLFLOW_TRACKING_URI=file:/app/mlruns
+
+# Database Configuration
+PREDICTIONS_DB_PATH=/app/monitoring/predictions.db
+
+# Logging
+LOG_LEVEL=INFO
+```
 
 ---
 
@@ -148,33 +176,68 @@ uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 - **Health Check**: `GET http://localhost:8000/health`
+- **Metrics Endpoint**: `GET http://localhost:8000/metrics`
 - **Interactive Swagger Docs**: `http://localhost:8000/docs`
-- **Prediction Request Example**:
-  ```bash
-  curl -X POST "http://localhost:8000/predict" \
-       -H "Content-Type: application/json" \
-       -d '{
-         "gender": "Female",
-         "SeniorCitizen": 0,
-         "Partner": "Yes",
-         "Dependents": "No",
-         "tenure": 12,
-         "PhoneService": "Yes",
-         "MultipleLines": "No",
-         "InternetService": "DSL",
-         "OnlineSecurity": "No",
-         "OnlineBackup": "Yes",
-         "DeviceProtection": "No",
-         "TechSupport": "No",
-         "StreamingTV": "No",
-         "StreamingMovies": "No",
-         "Contract": "Month-to-month",
-         "PaperlessBilling": "Yes",
-         "PaymentMethod": "Electronic check",
-         "MonthlyCharges": 65.50,
-         "TotalCharges": 786.00
-       }'
-  ```
+- **ReDoc Documentation**: `http://localhost:8000/redoc`
+
+#### Single Prediction Request Example:
+```bash
+curl -X POST "http://localhost:8000/predict" \
+     -H "Content-Type: application/json" \
+     -H "X-API-Key: your-api-key" \
+     -d '{
+       "gender": "Female",
+       "SeniorCitizen": 0,
+       "Partner": "Yes",
+       "Dependents": "No",
+       "tenure": 12,
+       "PhoneService": "Yes",
+       "MultipleLines": "No",
+       "InternetService": "DSL",
+       "OnlineSecurity": "No",
+       "OnlineBackup": "Yes",
+       "DeviceProtection": "No",
+       "TechSupport": "No",
+       "StreamingTV": "No",
+       "StreamingMovies": "No",
+       "Contract": "Month-to-month",
+       "PaperlessBilling": "Yes",
+       "PaymentMethod": "Electronic check",
+       "MonthlyCharges": 65.50,
+       "TotalCharges": 786.00
+     }'
+```
+
+#### Batch Prediction Request Example:
+```bash
+curl -X POST "http://localhost:8000/predict/batch" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "customers": [
+         {
+           "gender": "Female",
+           "SeniorCitizen": 0,
+           "Partner": "Yes",
+           "Dependents": "No",
+           "tenure": 12,
+           "PhoneService": "Yes",
+           "MultipleLines": "No",
+           "InternetService": "DSL",
+           "OnlineSecurity": "No",
+           "OnlineBackup": "Yes",
+           "DeviceProtection": "No",
+           "TechSupport": "No",
+           "StreamingTV": "No",
+           "StreamingMovies": "No",
+           "Contract": "Month-to-month",
+           "PaperlessBilling": "Yes",
+           "PaymentMethod": "Electronic check",
+           "MonthlyCharges": 65.50,
+           "TotalCharges": 786.00
+         }
+       ]
+     }'
+```
 
 ---
 
@@ -217,9 +280,9 @@ python pipelines/retrain_pipeline.py
 
 ### Phase 7: Automated Unit Testing
 
-Run the 10-suite pytest suite:
+Run the comprehensive test suite:
 ```bash
-pytest tests/ -v
+pytest tests/ -v --cov=src --cov=api
 ```
 
 ---
@@ -232,3 +295,44 @@ The GitHub Actions workflow (`.github/workflows/ci-cd.yml`) automates quality co
 2. **Retraining & Promotion**: On push to `main`, executes `pipelines/retrain_pipeline.py` to train new candidates on incoming data, evaluates candidate metrics against the active Production model on a held-out test set, and only promotes to `"Production"` if candidate performance is superior.
 3. **Docker Build**: Builds and validates the container image for seamless deployment.
 
+---
+
+## 📈 API Endpoints Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check with model status |
+| `/metrics` | GET | Prometheus-style metrics |
+| `/predict` | POST | Single customer prediction |
+| `/predict/batch` | POST | Batch customer prediction (max 100) |
+| `/docs` | GET | Interactive API documentation |
+| `/redoc` | GET | ReDoc API documentation |
+
+---
+
+## 🔍 Monitoring & Observability
+
+- **Request Tracing**: All requests include unique `X-Request-ID` header
+- **Structured Logging**: JSON-formatted logs with request context
+- **Performance Metrics**: Processing time tracked per request
+- **Database Logging**: All predictions stored in SQLite for audit
+- **Drift Detection**: PSI monitoring for data quality
+
+---
+
+## 🛡️ Security Features
+
+- **API Key Authentication**: Optional X-API-Key header validation
+- **Rate Limiting**: Configurable per-IP request limits
+- **CORS Configuration**: Customizable allowed origins
+- **Input Validation**: Pydantic schema validation with type checking
+- **Error Handling**: Custom exception handlers with request tracing
+
+---
+
+## 📚 Additional Resources
+
+- [MLflow Documentation](https://mlflow.org/docs/latest/index.html)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [Pydantic Documentation](https://docs.pydantic.dev/)
+- [Docker Documentation](https://docs.docker.com/)
