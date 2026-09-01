@@ -6,7 +6,7 @@ services:
   - type: web
     name: churnops-api
     env: docker
-    dockerfilePath: api/Dockerfile
+    dockerfilePath: Dockerfile
     plan: free
     healthCheckPath: /health
     envVars:
@@ -25,7 +25,7 @@ services:
   - type: web
     name: churnops-dashboard
     env: docker
-    dockerfilePath: api/Dockerfile
+    dockerfilePath: Dockerfile
     dockerCommand: streamlit run monitoring/dashboard.py --server.port $PORT --server.address 0.0.0.0
     plan: free
     envVars:
