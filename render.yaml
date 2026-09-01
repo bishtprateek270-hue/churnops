@@ -1,0 +1,35 @@
+# Render Blueprint Specification for ChurnOps MLOps Suite
+# Deploy with Render via https://dashboard.render.com/blueprints
+
+services:
+  # 1. FastAPI Model Serving Endpoint
+  - type: web
+    name: churnops-api
+    env: docker
+    dockerfilePath: api/Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: MLFLOW_TRACKING_URI
+        value: file:/app/mlruns
+      - key: PREDICTIONS_DB_PATH
+        value: /app/monitoring/predictions.db
+      - key: ENABLE_CORS
+        value: "true"
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "100"
+
+  # 2. Streamlit Monitoring Dashboard
+  - type: web
+    name: churnops-dashboard
+    env: docker
+    dockerfilePath: api/Dockerfile
+    dockerCommand: streamlit run monitoring/dashboard.py --server.port $PORT --server.address 0.0.0.0
+    plan: free
+    envVars:
+      - key: MLFLOW_TRACKING_URI
+        value: file:/app/mlruns
+      - key: PREDICTIONS_DB_PATH
+        value: /app/monitoring/predictions.db

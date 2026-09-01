@@ -241,16 +241,14 @@ curl -X POST "http://localhost:8000/predict/batch" \
 
 ---
 
-### Phase 4: Containerized Deployment (Docker)
+### Phase 4: Containerized & Cloud Deployment
 
-Build and run individual container services:
-```bash
-# Build Docker image
-docker build -t churnops-api:latest -f api/Dockerfile .
-
-# Run Docker container
-docker run -d -p 8000:8000 --name churnops-service churnops-api:latest
-```
+- **Local Docker Compose**:
+  ```bash
+  docker-compose up --build -d
+  ```
+- **Cloud Deployment (Render / Railway / GCP / AWS)**:
+  See the full **[DEPLOYMENT.md](DEPLOYMENT.md)** guide. Support is included for **Render Blueprints** ([`render.yaml`](render.yaml)), Railway, and containerized cloud providers.
 
 ---
 
