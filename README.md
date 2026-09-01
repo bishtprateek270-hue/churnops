@@ -4,6 +4,16 @@
 
 ---
 
+## 🌐 Live Deployment & Interactive Endpoints
+
+| Service | Live URL / Endpoint | Description |
+| :--- | :--- | :--- |
+| **Production API (Swagger Docs)** | [https://churnops-u0bn.onrender.com/docs](https://churnops-u0bn.onrender.com/docs) | Interactive FastAPI documentation & test console |
+| **API Health Check** | [https://churnops-u0bn.onrender.com/health](https://churnops-u0bn.onrender.com/health) | Real-time model registry & service status probe |
+| **API Root Endpoint** | [https://churnops-u0bn.onrender.com/](https://churnops-u0bn.onrender.com/) | Live API overview and endpoint map |
+
+---
+
 ## 🏗️ System Architecture
 
 ```mermaid
