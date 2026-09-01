@@ -191,7 +191,20 @@ def load_model_and_preprocessor():
         model_store["stage"] = "LocalFallback"
         model_store["loaded_at"] = datetime.now(timezone.utc).isoformat()
     else:
-        logger.error("No model found in MLflow Registry or local directory.")
+        logger.info("No pre-trained model found. Initializing initial baseline model...")
+        try:
+            from src.train import train_and_evaluate
+
+            train_and_evaluate(fast_mode=True)
+            if os.path.exists(fallback_path):
+                model_store["model"] = joblib.load(fallback_path)
+                model_store["preprocessor"] = load_preprocessor(settings.PREPROCESSOR_PATH)
+                model_store["version"] = "local-auto-1.0"
+                model_store["stage"] = "AutoTrained"
+                model_store["loaded_at"] = datetime.now(timezone.utc).isoformat()
+                logger.info("Successfully trained and loaded initial baseline model.")
+        except Exception as exc:
+            logger.error(f"Failed to auto-train initial baseline model: {exc}")
 
 
 def check_rate_limit(request: Request):
