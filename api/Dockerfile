@@ -13,14 +13,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Create application directories
-RUN mkdir -p /app/src /app/api /app/models /app/data /app/mlruns /app/monitoring /app/pipelines
+RUN mkdir -p /app/src /app/api /app/models /app/data /app/mlruns /app/monitoring /app/pipelines /app/reports
 
-# Copy application files
+# Copy application code
 COPY src/ /app/src/
 COPY api/ /app/api/
 COPY data/ /app/data/
-COPY models/ /app/models/
-COPY mlruns/ /app/mlruns/
 COPY monitoring/ /app/monitoring/
 COPY pipelines/ /app/pipelines/
 
