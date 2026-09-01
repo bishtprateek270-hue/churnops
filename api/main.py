@@ -2,6 +2,7 @@
 FastAPI Serving API for ChurnOps customer churn prediction.
 """
 
+import asyncio
 import logging
 import os
 import sys
@@ -9,6 +10,8 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+
+import httpx
 
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 
@@ -237,6 +240,22 @@ async def get_api_key(api_key: str | None = Depends(APIKeyHeader)):
     return api_key
 
 
+async def keep_alive_task():
+    """Background task to ping health endpoint every 5 minutes, preventing Render free instance spin-down/cold-starts."""
+    await asyncio.sleep(15)
+    while True:
+        try:
+            target_url = os.getenv("RENDER_EXTERNAL_URL", f"http://127.0.0.1:{settings.API_PORT}")
+            if not target_url.endswith("/health"):
+                target_url = f"{target_url.rstrip('/')}/health"
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.get(target_url)
+                logger.debug("Keep-alive ping sent successfully.")
+        except Exception as exc:
+            logger.debug(f"Keep-alive ping note: {exc}")
+        await asyncio.sleep(300)  # Ping every 5 minutes (300 seconds)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
@@ -244,9 +263,11 @@ async def lifespan(app: FastAPI):
     init_sqlite_db()
     load_model_and_preprocessor()
     logger.info("ChurnOps API startup complete")
+    ping_task = asyncio.create_task(keep_alive_task())
     yield
     # Shutdown logic
     logger.info("Shutting down ChurnOps API...")
+    ping_task.cancel()
 
 
 app = FastAPI(
