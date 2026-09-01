@@ -1,16 +1,38 @@
-# ⚡ ChurnOps: Production MLOps Pipeline for Customer Churn Prediction
+# ⚡ ChurnOps: Enterprise MLOps Suite for Customer Churn Prediction
 
-**ChurnOps** is an end-to-end, production-grade MLOps system built to automate data validation, model training, experiment tracking, model registry management, REST API serving, continuous integration/retraining, and data drift monitoring for customer churn prediction.
+[![CI/CD Pipeline](https://github.com/bishtprateek270-hue/churnops/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/bishtprateek270-hue/churnops/actions)
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688.svg?style=flat&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-FF4B4B.svg?style=flat&logo=Streamlit&logoColor=white)](https://streamlit.io)
+[![MLflow](https://img.shields.io/badge/MLflow-2.10+-0194E2.svg?style=flat&logo=MLflow&logoColor=white)](https://mlflow.org)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=flat&logo=Docker&logoColor=white)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**ChurnOps** is an end-to-end, production-grade MLOps system built to automate dataset validation, feature engineering, hyperparameter tuning, MLflow experiment tracking, model registry promotion, FastAPI REST serving, automated CI/CD retraining, and real-time distribution drift monitoring.
 
 ---
 
-## 🌐 Live Deployment & Interactive Endpoints
+## 🌐 Live Production Deployment
 
-| Service | Live URL / Endpoint | Description |
+The application is deployed live in production on Render with dynamic keep-alive monitoring:
+
+| Component | Live Endpoint | Description |
 | :--- | :--- | :--- |
-| **Production API (Swagger Docs)** | [https://churnops-u0bn.onrender.com/docs](https://churnops-u0bn.onrender.com/docs) | Interactive FastAPI documentation & test console |
-| **API Health Check** | [https://churnops-u0bn.onrender.com/health](https://churnops-u0bn.onrender.com/health) | Real-time model registry & service status probe |
-| **API Root Endpoint** | [https://churnops-u0bn.onrender.com/](https://churnops-u0bn.onrender.com/) | Live API overview and endpoint map |
+| 🚀 **Interactive API Docs (Swagger)** | [https://churnops-u0bn.onrender.com/docs](https://churnops-u0bn.onrender.com/docs) | Live FastAPI documentation & interactive test console |
+| 💓 **Health & Model Status Probe** | [https://churnops-u0bn.onrender.com/health](https://churnops-u0bn.onrender.com/health) | Real-time model registry status, version & health probe |
+| 🌐 **API Root Map** | [https://churnops-u0bn.onrender.com/](https://churnops-u0bn.onrender.com/) | Live API overview and endpoint directory |
+| 📊 **ReDoc Specifications** | [https://churnops-u0bn.onrender.com/redoc](https://churnops-u0bn.onrender.com/redoc) | Alternative OpenAPI documentation interface |
+
+---
+
+## Key Platform Capabilities
+
+- **Dataset-Agnostic Pipeline**: Automatically detects numerical/categorical columns, row identifiers, missing values, and target leakage across custom user uploads.
+- **Automated Model Suite & Tuning**: Evaluates Logistic Regression, Random Forest, HistGradientBoosting, XGBoost, and CatBoost with Optuna hyperparameter optimization and SMOTE class imbalance handling.
+- **Automated Retrain & Promotion**: Compares Staging candidates against current Production models on held-out evaluation sets, executing automatic stage promotion in MLflow Registry if performance metrics improve.
+- **Production REST API**: High-throughput FastAPI endpoint supporting single and batch inference (`/predict`, `/predict/batch`), request ID tracing, rate limiting, and CORS headers.
+- **Data Drift Monitoring**: Calculates Population Stability Index (PSI) and 2-sample Kolmogorov-Smirnov (KS) tests comparing live inference logs (`predictions.db`) against reference training baseline distributions.
+- **Real-Time Streamlit Dashboard**: Provides visual analytics for inference volume, live churn probability distributions, active model stages, and feature drift alerts.
 
 ---
 
@@ -18,125 +40,48 @@
 
 ```mermaid
 flowchart TD
-    subgraph Data & Pipeline Layer
-        A[Telco Churn Dataset] --> B[Data Validation src/data_validation.py]
-        B --> C[Preprocessing Pipeline src/preprocessing.py]
+    subgraph Data & Feature Engineering Layer
+        A[Raw Input Datasets] --> B[Data Validation src/data_validation.py]
+        B --> C[Dataset-Agnostic Transformer src/preprocessing.py]
     end
 
     subgraph Training & MLflow Tracking
-        C --> D[Multi-Model Trainer src/train.py]
-        D -->|Train Log Params & Metrics| E[(MLflow Tracking Store)]
-        D -->|Evaluate Val F1 Score| F{Best Model Selector}
+        C --> D[Multi-Model Suite src/train.py]
+        D -->|Log Parameters & Metrics| E[(MLflow Tracking Store)]
+        D -->|Evaluate Holdout Metrics| F{Best Model Selector}
         F -->|Register & Stage| G[(MLflow Model Registry - Staging)]
     end
 
-    subgraph Evaluation & Promotion
+    subgraph Automated Evaluation & Promotion
         G --> H[Evaluator src/evaluate.py]
-        H -->|Compare vs Prod Test Set| I{Candidate F1 > Prod F1?}
+        H -->|Compare Holdout Performance| I{Candidate F1 > Production F1?}
         I -->|Yes| J[(MLflow Model Registry - Production)]
-        I -->|No| K[Keep Current Production Model]
+        I -->|No| K[Retain Active Production Model]
     end
 
-    subgraph Serving & Monitoring
+    subgraph Production Serving & Drift Analytics
         J --> L[FastAPI App api/main.py]
-        L -->|Post Requests| M[Inference /predict Endpoint]
-        M -->|Log Request Payload| N[(SQLite DB predictions.db)]
+        L -->|POST Predictions| M[Inference /predict Endpoint]
+        M -->|Log Payload & Latency| N[(SQLite DB predictions.db)]
         N --> O[PSI Drift Monitor monitoring/drift_check.py]
         N --> P[Streamlit Dashboard monitoring/dashboard.py]
     end
 
     subgraph CI/CD Automation
-        Q[GitHub Actions push/PR] --> R[Lint & Pytest]
-        R --> S[Retrain Pipeline retrain_pipeline.py]
-        S --> T[Docker Build api/Dockerfile]
+        Q[GitHub Actions push/PR] --> R[Ruff Linting & Pytest Suite]
+        R --> S[Automated Retraining Pipeline pipelines/retrain_pipeline.py]
+        S --> T[Docker Container Build Dockerfile]
     end
-```
-
----
-
-## 📁 Repository Structure
-
-```
-churnops/
-├── data/
-│   ├── raw/                       # Raw input datasets (tracked via DVC)
-│   ├── processed/                 # Processed test sets for candidate evaluation
-│   └── generate_dataset.py        # Synthetic Telco Customer Churn dataset generator
-├── src/
-│   ├── data_validation.py         # Schema, null, and numerical range validators
-│   ├── preprocessing.py           # Dataset-agnostic sklearn ColumnTransformer pipeline
-│   ├── eda_inspector.py           # Dataset inspection and target leakage detection
-│   ├── train.py                   # Multi-model training, Optuna, SMOTE, MLflow tracking
-│   └── evaluate.py                # Candidate vs Production evaluation and promotion
-├── api/
-│   ├── main.py                    # FastAPI application loading Production MLflow model
-│   ├── schemas.py                 # Pydantic input/output validation models
-│   └── Dockerfile                 # Multi-stage production container configuration
-├── monitoring/
-│   ├── drift_check.py             # PSI & KS-test data drift detector
-│   └── dashboard.py               # Streamlit real-time monitoring dashboard
-├── pipelines/
-│   └── retrain_pipeline.py        # End-to-end retraining & evaluation pipeline
-├── tests/                         # 10 comprehensive unit test suites
-├── .github/workflows/
-│   └── ci-cd.yml                  # GitHub Actions workflow (lint, test, retrain, docker)
-├── docker-compose.yml             # One-command multi-container orchestration
-├── .dockerignore                  # Docker build context optimization rules
-├── dvc.yaml                       # DVC pipeline declaration
-├── requirements.txt               # Pinned Python dependencies
-├── pyproject.toml                 # Project configuration and tool settings
-├── .env.example                   # Environment variables template
-└── README.md                      # Documentation
-```
-
----
-
-## ⚡ Quickstart: One-Command Docker Compose
-
-Launch the complete stack (FastAPI REST API, Streamlit Dashboard, and MLflow Tracking UI) in isolated containers with a single command:
-
-```bash
-docker-compose up --build -d
-```
-
-- 🚀 **FastAPI Prediction API**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- 📊 **Streamlit Monitoring Dashboard**: [http://localhost:8501](http://localhost:8501)
-- 🧪 **MLflow Tracking UI**: [http://localhost:5000](http://localhost:5000)
-
----
-
-## 🔐 Security & Configuration
-
-### Environment Variables
-
-Create a `.env` file in the root directory:
-
-```bash
-# API Configuration
-ENABLE_AUTH=false                    # Enable API key authentication
-API_KEY_SECRET=your-secret-key       # Required if ENABLE_AUTH=true
-RATE_LIMIT_PER_MINUTE=100            # Rate limit per IP
-ENABLE_CORS=true                     # Enable CORS
-CORS_ORIGINS=*                       # Comma-separated allowed origins
-
-# MLflow Configuration
-MLFLOW_TRACKING_URI=file:/app/mlruns
-
-# Database Configuration
-PREDICTIONS_DB_PATH=/app/monitoring/predictions.db
-
-# Logging
-LOG_LEVEL=INFO
 ```
 
 ---
 
 ## 📊 Model Performance Benchmarks
 
-Below is the comparative evaluation of the candidate model suite on the held-out Telco Customer Churn test set (evaluated with Stratified 5-Fold Cross Validation & threshold cost optimization):
+Evaluated on the held-out Telco Customer Churn test set using Stratified 5-Fold Cross Validation with business decision cost optimization:
 
-| Model Candidate | Validation F1 | ROC-AUC | PR-AUC | Precision | Recall | Training Time |
-|---|---|---|---|---|---|---|
+| Model Candidate | Validation F1 | ROC-AUC | PR-AUC | Precision | Recall | Training Latency |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **CatBoost** (Winner 🏆) | **0.826** | **0.912** | **0.884** | **0.810** | **0.843** | 4.8s |
 | **XGBoost** | 0.818 | 0.905 | 0.876 | 0.802 | 0.835 | 3.9s |
 | **HistGradientBoosting** | 0.804 | 0.892 | 0.861 | 0.791 | 0.818 | 1.8s |
@@ -145,56 +90,90 @@ Below is the comparative evaluation of the candidate model suite on the held-out
 
 ---
 
-## 🛠️ Step-by-Step Execution Workflow
+## 📁 Repository Structure
 
-### Phase 1: Generate Dataset & Train Models with MLflow
-
-1. **Generate Dataset**:
-   ```bash
-   python data/generate_dataset.py
-   ```
-
-2. **Train Models & Log to MLflow**:
-   ```bash
-   python src/train.py
-   ```
-   *Trains Logistic Regression, Random Forest, HistGradientBoosting, XGBoost, and CatBoost. Handles class imbalance via SMOTE, performs Optuna hyperparameter tuning, logs metrics/plots to MLflow, and registers the top model to Stage `"Staging"`.*
-
-3. **View MLflow Tracking UI**:
-   ```bash
-   mlflow ui --port 5000
-   ```
-   Open `http://localhost:5000` to inspect experiment runs, metrics, and registered models.
-
----
-
-### Phase 2: Model Evaluation & Stage Promotion
-
-Run evaluation comparing the Staging candidate model against current Production model:
-```bash
-python src/evaluate.py
 ```
-*If candidate metrics exceed the current Production model metrics, the model is automatically promoted to `"Production"` in MLflow Registry.*
+churnops/
+├── data/
+│   ├── raw/                       # Raw input datasets (tracked via DVC / Git)
+│   ├── processed/                 # Evaluation test sets
+│   └── generate_dataset.py        # Synthetic dataset generator
+├── src/
+│   ├── config.py                  # Centralized, environment-aware configuration settings
+│   ├── data_validation.py         # Schema, null, and range validators
+│   ├── preprocessing.py           # Dataset-agnostic sklearn ColumnTransformer pipeline
+│   ├── eda_inspector.py           # Dataset inspection and data leakage detection
+│   ├── train.py                   # Model suite training, Optuna, SMOTE & MLflow tracking
+│   └── evaluate.py                # Candidate vs Production evaluation and stage promotion
+├── api/
+│   ├── main.py                    # Production FastAPI serving API with auto-training fallback
+│   ├── schemas.py                 # Pydantic schema validation models
+│   └── Dockerfile                 # Multi-stage production container configuration
+├── monitoring/
+│   ├── drift_check.py             # Population Stability Index (PSI) & KS drift detector
+│   ├── predict_utils.py           # Streamlit reload helpers & prediction utilities
+│   └── dashboard.py               # Streamlit real-time monitoring dashboard
+├── pipelines/
+│   └── retrain_pipeline.py        # Automated retraining & model promotion pipeline
+├── tests/                         # Unit & integration test suites
+├── .github/workflows/
+│   └── ci-cd.yml                  # GitHub Actions CI/CD automation workflow
+├── docker-compose.yml             # Docker Compose multi-container orchestration
+├── Dockerfile                     # Root container build definition
+├── render.yaml                    # Render Blueprint IaC specification
+├── DEPLOYMENT.md                  # Comprehensive Cloud Deployment Guide
+├── .env.example                   # Environment configuration template
+├── pyproject.toml                 # Tool configuration (Ruff, Pytest, Coverage)
+└── requirements.txt               # Dependencies list
+```
 
 ---
 
-### Phase 3: Serve Predictions via FastAPI API
+## 🚀 Quickstart
 
-Launch the production REST API:
+### 1. One-Command Docker Compose (Local Stack)
+
+Launch the complete stack (FastAPI REST API, Streamlit Dashboard, and MLflow UI) concurrently:
+
 ```bash
+docker-compose up --build -d
+```
+
+- **FastAPI Prediction API**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Streamlit Analytics Dashboard**: [http://localhost:8501](http://localhost:8501)
+- **MLflow Tracking UI**: [http://localhost:5000](http://localhost:5000)
+
+---
+
+### 2. Manual Local Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/bishtprateek270-hue/churnops.git
+cd churnops
+
+# Create virtual environment & install dependencies
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# Generate synthetic dataset & train initial models
+python data/generate_dataset.py
+python src/train.py
+
+# Launch FastAPI server
 uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-- **Health Check**: `GET http://localhost:8000/health`
-- **Metrics Endpoint**: `GET http://localhost:8000/metrics`
-- **Interactive Swagger Docs**: `http://localhost:8000/docs`
-- **ReDoc Documentation**: `http://localhost:8000/redoc`
+---
 
-#### Single Prediction Request Example:
+## 💻 API Usage Examples
+
+### Single Prediction Request (`POST /predict`)
+
 ```bash
-curl -X POST "http://localhost:8000/predict" \
+curl -X POST "https://churnops-u0bn.onrender.com/predict" \
      -H "Content-Type: application/json" \
-     -H "X-API-Key: your-api-key" \
      -d '{
        "gender": "Female",
        "SeniorCitizen": 0,
@@ -218,129 +197,43 @@ curl -X POST "http://localhost:8000/predict" \
      }'
 ```
 
-#### Batch Prediction Request Example:
-```bash
-curl -X POST "http://localhost:8000/predict/batch" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "customers": [
-         {
-           "gender": "Female",
-           "SeniorCitizen": 0,
-           "Partner": "Yes",
-           "Dependents": "No",
-           "tenure": 12,
-           "PhoneService": "Yes",
-           "MultipleLines": "No",
-           "InternetService": "DSL",
-           "OnlineSecurity": "No",
-           "OnlineBackup": "Yes",
-           "DeviceProtection": "No",
-           "TechSupport": "No",
-           "StreamingTV": "No",
-           "StreamingMovies": "No",
-           "Contract": "Month-to-month",
-           "PaperlessBilling": "Yes",
-           "PaymentMethod": "Electronic check",
-           "MonthlyCharges": 65.50,
-           "TotalCharges": 786.00
-         }
-       ]
-     }'
+#### Sample API Response:
+```json
+{
+  "churn_prediction": 1,
+  "churn_label": "Yes",
+  "churn_probability": 0.7482,
+  "model_version": "1",
+  "processing_time_ms": 14.2
+}
 ```
 
 ---
 
-### Phase 4: Containerized & Cloud Deployment
+## ☁️ Cloud Deployment
 
-- **Local Docker Compose**:
-  ```bash
-  docker-compose up --build -d
-  ```
-- **Cloud Deployment (Render / Railway / GCP / AWS)**:
-  See the full **[DEPLOYMENT.md](DEPLOYMENT.md)** guide. Support is included for **Render Blueprints** ([`render.yaml`](render.yaml)), Railway, and containerized cloud providers.
+Support is pre-configured for **Render**, **Railway**, **Google Cloud Run**, and **AWS ECS**:
+
+- **Render Blueprint Deployment**: Connect your GitHub repository to Render using [`render.yaml`](render.yaml).
+- **Comprehensive Guide**: Follow the step-by-step instructions in **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
 ---
 
-### Phase 5: Automated Retraining Pipeline
+## 🧪 Automated Testing & CI/CD
 
-Execute the full automated retraining cycle:
+Run the test suite locally:
+
 ```bash
-python pipelines/retrain_pipeline.py
+pytest tests/ -v
 ```
 
----
-
-### Phase 6: Monitoring & Streamlit Dashboard
-
-1. **Run Population Stability Index (PSI) Data Drift Check**:
-   ```bash
-   python monitoring/drift_check.py
-   ```
-
-2. **Launch Streamlit Monitoring Dashboard**:
-   ```bash
-   streamlit run monitoring/dashboard.py
-   ```
-   Open `http://localhost:8501` to view prediction volume, live churn rate, active model version, PSI drift alerts, and feature distribution comparison plots.
+### GitHub Actions Workflow ([`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml))
+1. **Quality Gate**: Executes `ruff check .` and `pytest` test suites on every push/PR.
+2. **Automated Retraining**: Runs `pipelines/retrain_pipeline.py` on push to `main`, promoting superior candidate models to `"Production"` in MLflow Registry.
+3. **Container Build**: Validates Docker image compilation for cloud deployment readiness.
 
 ---
 
-### Phase 7: Automated Unit Testing
+## 📄 License
 
-Run the comprehensive test suite:
-```bash
-pytest tests/ -v --cov=src --cov=api
-```
-
----
-
-## 🔄 CI/CD Retrain-and-Promote Flow
-
-The GitHub Actions workflow (`.github/workflows/ci-cd.yml`) automates quality control and model lifecycle management:
-
-1. **Linting & Testing**: Runs `ruff check .` and `pytest` on every push/PR.
-2. **Retraining & Promotion**: On push to `main`, executes `pipelines/retrain_pipeline.py` to train new candidates on incoming data, evaluates candidate metrics against the active Production model on a held-out test set, and only promotes to `"Production"` if candidate performance is superior.
-3. **Docker Build**: Builds and validates the container image for seamless deployment.
-
----
-
-## 📈 API Endpoints Reference
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check with model status |
-| `/metrics` | GET | Prometheus-style metrics |
-| `/predict` | POST | Single customer prediction |
-| `/predict/batch` | POST | Batch customer prediction (max 100) |
-| `/docs` | GET | Interactive API documentation |
-| `/redoc` | GET | ReDoc API documentation |
-
----
-
-## 🔍 Monitoring & Observability
-
-- **Request Tracing**: All requests include unique `X-Request-ID` header
-- **Structured Logging**: JSON-formatted logs with request context
-- **Performance Metrics**: Processing time tracked per request
-- **Database Logging**: All predictions stored in SQLite for audit
-- **Drift Detection**: PSI monitoring for data quality
-
----
-
-## 🛡️ Security Features
-
-- **API Key Authentication**: Optional X-API-Key header validation
-- **Rate Limiting**: Configurable per-IP request limits
-- **CORS Configuration**: Customizable allowed origins
-- **Input Validation**: Pydantic schema validation with type checking
-- **Error Handling**: Custom exception handlers with request tracing
-
----
-
-## 📚 Additional Resources
-
-- [MLflow Documentation](https://mlflow.org/docs/latest/index.html)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Pydantic Documentation](https://docs.pydantic.dev/)
-- [Docker Documentation](https://docs.docker.com/)
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
