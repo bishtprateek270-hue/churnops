@@ -310,6 +310,19 @@ async def add_request_id(request: Request, call_next):
     return response
 
 
+@app.get("/")
+@app.head("/")
+def root():
+    """Root endpoint providing service overview and status."""
+    return {
+        "service": "ChurnOps Customer Churn Prediction API",
+        "status": "online",
+        "health_check": "/health",
+        "documentation": "/docs",
+        "metrics": "/metrics",
+    }
+
+
 @app.get("/health", response_model=HealthResponse)
 def health_check():
     """Health check endpoint with detailed model status."""
