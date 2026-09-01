@@ -26,7 +26,7 @@ import mlflow.pyfunc
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import APIKeyHeader
 
 from api.schemas import BatchChurnInput, BatchChurnOutput, ChurnInput, ChurnOutput, HealthResponse
@@ -310,17 +310,657 @@ async def add_request_id(request: Request, call_next):
     return response
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 @app.head("/")
 def root():
-    """Root endpoint providing service overview and status."""
-    return {
-        "service": "ChurnOps Customer Churn Prediction API",
-        "status": "online",
-        "health_check": "/health",
-        "documentation": "/docs",
-        "metrics": "/metrics",
-    }
+    """Root endpoint delivering an interactive Web Application UI for ChurnOps."""
+    html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChurnOps - Customer Churn Prediction System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --primary-accent: #6366f1;
+            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+            --danger-gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(217, 70, 239, 0.15) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 2rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-badge {
+            background: var(--primary-gradient);
+            padding: 0.5rem 0.85rem;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 1.25rem;
+            box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+        }
+
+        .logo-title h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .logo-title p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary-accent);
+            transform: translateY(-1px);
+        }
+
+        .preset-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            padding: 1rem 1.5rem;
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .preset-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        .preset-btns {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.4rem 0.85rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+        }
+
+        .section-header {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            color: var(--primary-accent);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-section {
+            margin-bottom: 2rem;
+        }
+
+        .fields-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .field-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        label {
+            font-size: 0.825rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        select, input[type="number"] {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.6rem 0.8rem;
+            color: var(--text-main);
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        select:focus, input[type="number"]:focus {
+            border-color: var(--primary-accent);
+        }
+
+        .btn-submit {
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 1rem;
+            border-radius: 12px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+            margin-top: 1rem;
+        }
+
+        .btn-submit:hover {
+            opacity: 0.95;
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px -5px rgba(99, 102, 241, 0.6);
+        }
+
+        .result-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: sticky;
+            top: 2rem;
+            height: fit-content;
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+        }
+
+        .gauge-container {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            background: conic-gradient(var(--primary-accent) 0%, rgba(255, 255, 255, 0.1) 0%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 1.5rem 0;
+            position: relative;
+            transition: background 0.8s ease;
+        }
+
+        .gauge-inner {
+            width: 130px;
+            height: 130px;
+            background: var(--bg-dark);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .gauge-value {
+            font-size: 2rem;
+            font-weight: 800;
+        }
+
+        .gauge-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1.25rem;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-danger {
+            background: var(--danger-gradient);
+            color: white;
+            box-shadow: 0 10px 20px -5px rgba(239, 68, 68, 0.5);
+        }
+
+        .badge-success {
+            background: var(--success-gradient);
+            color: white;
+            box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.5);
+        }
+
+        .meta-list {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1.25rem;
+            font-size: 0.85rem;
+        }
+
+        .meta-item {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-muted);
+        }
+
+        .meta-item span:last-child {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-group">
+                <div class="logo-badge">⚡</div>
+                <div class="logo-title">
+                    <h1>ChurnOps</h1>
+                    <p>Enterprise Customer Churn Prediction Engine</p>
+                </div>
+            </div>
+            <div class="nav-links">
+                <a href="/docs" target="_blank" class="nav-btn">🚀 Swagger API Docs</a>
+                <a href="/health" target="_blank" class="nav-btn">💓 Health Probe</a>
+                <a href="/metrics" target="_blank" class="nav-btn">📊 Prometheus Metrics</a>
+                <a href="https://github.com/bishtprateek270-hue/churnops" target="_blank" class="nav-btn">🐙 GitHub Repository</a>
+            </div>
+        </header>
+
+        <div class="preset-bar">
+            <span class="preset-title">Fill Quick Demo Profiles:</span>
+            <div class="preset-btns">
+                <button type="button" class="btn-secondary" onclick="loadPreset('high')">⚠️ High Churn Risk Customer</button>
+                <button type="button" class="btn-secondary" onclick="loadPreset('low')">✅ Low Churn Risk Customer</button>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="form-card">
+                <form id="churnForm">
+                    <div class="form-section">
+                        <div class="section-header">👤 Customer Profile & Demographics</div>
+                        <div class="fields-grid">
+                            <div class="field-group">
+                                <label for="gender">Gender</label>
+                                <select id="gender">
+                                    <option value="Female">Female</option>
+                                    <option value="Male">Male</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="SeniorCitizen">Senior Citizen</label>
+                                <select id="SeniorCitizen">
+                                    <option value="0">No (0)</option>
+                                    <option value="1">Yes (1)</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="Partner">Partner</label>
+                                <select id="Partner">
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="Dependents">Dependents</label>
+                                <select id="Dependents">
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-header">📶 Subscribed Services</div>
+                        <div class="fields-grid">
+                            <div class="field-group">
+                                <label for="tenure">Tenure (Months)</label>
+                                <input type="number" id="tenure" value="12" min="0" max="100">
+                            </div>
+                            <div class="field-group">
+                                <label for="PhoneService">Phone Service</label>
+                                <select id="PhoneService">
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="MultipleLines">Multiple Lines</label>
+                                <select id="MultipleLines">
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No phone service">No phone service</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="InternetService">Internet Service</label>
+                                <select id="InternetService">
+                                    <option value="Fiber optic">Fiber optic</option>
+                                    <option value="DSL">DSL</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="OnlineSecurity">Online Security</label>
+                                <select id="OnlineSecurity">
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No internet service">No internet service</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="OnlineBackup">Online Backup</label>
+                                <select id="OnlineBackup">
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No internet service">No internet service</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="DeviceProtection">Device Protection</label>
+                                <select id="DeviceProtection">
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No internet service">No internet service</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="TechSupport">Tech Support</label>
+                                <select id="TechSupport">
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No internet service">No internet service</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="StreamingTV">Streaming TV</label>
+                                <select id="StreamingTV">
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No internet service">No internet service</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="StreamingMovies">Streaming Movies</label>
+                                <select id="StreamingMovies">
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                    <option value="No internet service">No internet service</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-header">💳 Billing & Contract Information</div>
+                        <div class="fields-grid">
+                            <div class="field-group">
+                                <label for="Contract">Contract Type</label>
+                                <select id="Contract">
+                                    <option value="Month-to-month">Month-to-month</option>
+                                    <option value="One year">One year</option>
+                                    <option value="Two year">Two year</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="PaperlessBilling">Paperless Billing</label>
+                                <select id="PaperlessBilling">
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="PaymentMethod">Payment Method</label>
+                                <select id="PaymentMethod">
+                                    <option value="Electronic check">Electronic check</option>
+                                    <option value="Mailed check">Mailed check</option>
+                                    <option value="Bank transfer (automatic)">Bank transfer (automatic)</option>
+                                    <option value="Credit card (automatic)">Credit card (automatic)</option>
+                                </select>
+                            </div>
+                            <div class="field-group">
+                                <label for="MonthlyCharges">Monthly Charges ($)</label>
+                                <input type="number" id="MonthlyCharges" value="70.35" step="0.01">
+                            </div>
+                            <div class="field-group">
+                                <label for="TotalCharges">Total Charges ($)</label>
+                                <input type="number" id="TotalCharges" value="844.20" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-submit">⚡ Run Live Churn Prediction</button>
+                </form>
+            </div>
+
+            <div class="result-card">
+                <h3>Prediction Analytics</h3>
+
+                <div class="gauge-container" id="gauge">
+                    <div class="gauge-inner">
+                        <div class="gauge-value" id="probValue">--%</div>
+                        <div class="gauge-label">Probability</div>
+                    </div>
+                </div>
+
+                <div class="status-badge badge-success" id="statusBadge">Awaiting Input</div>
+
+                <div class="meta-list">
+                    <div class="meta-item">
+                        <span>Prediction Outcome:</span>
+                        <span id="labelValue">Pending</span>
+                    </div>
+                    <div class="meta-item">
+                        <span>Inference Latency:</span>
+                        <span id="latencyValue">-- ms</span>
+                    </div>
+                    <div class="meta-item">
+                        <span>Active Model Stage:</span>
+                        <span id="stageValue">Production</span>
+                    </div>
+                    <div class="meta-item">
+                        <span>Model Version:</span>
+                        <span id="versionValue">v1.0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const highRisk = {
+            gender: "Female", SeniorCitizen: 1, Partner: "No", Dependents: "No", tenure: 2,
+            PhoneService: "Yes", MultipleLines: "No", InternetService: "Fiber optic",
+            OnlineSecurity: "No", OnlineBackup: "No", DeviceProtection: "No", TechSupport: "No",
+            StreamingTV: "Yes", StreamingMovies: "Yes", Contract: "Month-to-month",
+            PaperlessBilling: "Yes", PaymentMethod: "Electronic check", MonthlyCharges: 95.70, TotalCharges: 191.40
+        };
+
+        const lowRisk = {
+            gender: "Male", SeniorCitizen: 0, Partner: "Yes", Dependents: "Yes", tenure: 60,
+            PhoneService: "Yes", MultipleLines: "Yes", InternetService: "DSL",
+            OnlineSecurity: "Yes", OnlineBackup: "Yes", DeviceProtection: "Yes", TechSupport: "Yes",
+            StreamingTV: "Yes", StreamingMovies: "Yes", Contract: "Two year",
+            PaperlessBilling: "No", PaymentMethod: "Credit card (automatic)", MonthlyCharges: 85.10, TotalCharges: 5106.00
+        };
+
+        function loadPreset(type) {
+            const data = type === 'high' ? highRisk : lowRisk;
+            for (const key in data) {
+                const el = document.getElementById(key);
+                if (el) el.value = data[key];
+            }
+            document.getElementById('churnForm').dispatchEvent(new Event('submit'));
+        }
+
+        document.getElementById('churnForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const payload = {
+                gender: document.getElementById('gender').value,
+                SeniorCitizen: parseInt(document.getElementById('SeniorCitizen').value),
+                Partner: document.getElementById('Partner').value,
+                Dependents: document.getElementById('Dependents').value,
+                tenure: parseInt(document.getElementById('tenure').value),
+                PhoneService: document.getElementById('PhoneService').value,
+                MultipleLines: document.getElementById('MultipleLines').value,
+                InternetService: document.getElementById('InternetService').value,
+                OnlineSecurity: document.getElementById('OnlineSecurity').value,
+                OnlineBackup: document.getElementById('OnlineBackup').value,
+                DeviceProtection: document.getElementById('DeviceProtection').value,
+                TechSupport: document.getElementById('TechSupport').value,
+                StreamingTV: document.getElementById('StreamingTV').value,
+                StreamingMovies: document.getElementById('StreamingMovies').value,
+                Contract: document.getElementById('Contract').value,
+                PaperlessBilling: document.getElementById('PaperlessBilling').value,
+                PaymentMethod: document.getElementById('PaymentMethod').value,
+                MonthlyCharges: parseFloat(document.getElementById('MonthlyCharges').value),
+                TotalCharges: parseFloat(document.getElementById('TotalCharges').value)
+            };
+
+            try {
+                const startTime = performance.now();
+                const res = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                const endTime = performance.now();
+                const latency = Math.round(endTime - startTime);
+
+                if (res.ok) {
+                    const prob = Math.round(data.churn_probability * 100);
+                    document.getElementById('probValue').innerText = prob + '%';
+                    document.getElementById('labelValue').innerText = data.churn_label === 'Yes' ? 'HIGH CHURN RISK' : 'LOW CHURN RISK';
+                    document.getElementById('latencyValue').innerText = (data.processing_time_ms || latency) + ' ms';
+                    document.getElementById('versionValue').innerText = data.model_version || '1.0';
+
+                    const gauge = document.getElementById('gauge');
+                    const badge = document.getElementById('statusBadge');
+
+                    if (data.churn_prediction === 1) {
+                        gauge.style.background = `conic-gradient(#ef4444 ${prob}%, rgba(255, 255, 255, 0.1) 0%)`;
+                        badge.className = 'status-badge badge-danger';
+                        badge.innerText = 'HIGH CHURN RISK';
+                    } else {
+                        gauge.style.background = `conic-gradient(#10b981 ${prob}%, rgba(255, 255, 255, 0.1) 0%)`;
+                        badge.className = 'status-badge badge-success';
+                        badge.innerText = 'LOW CHURN RISK';
+                    }
+                } else {
+                    alert('Prediction failed: ' + (data.detail || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Error connecting to API: ' + err.message);
+            }
+        });
+
+        // Initial prediction on load
+        window.addEventListener('load', () => {
+            document.getElementById('churnForm').dispatchEvent(new Event('submit'));
+        });
+    </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)
 
 
 @app.get("/health", response_model=HealthResponse)
