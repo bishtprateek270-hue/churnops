@@ -324,6 +324,7 @@ def root():
 
 
 @app.get("/health", response_model=HealthResponse)
+@app.head("/health")
 def health_check():
     """Health check endpoint with detailed model status."""
     model_loaded = model_store["model"] is not None
@@ -341,6 +342,7 @@ def health_check():
 
 
 @app.get("/metrics")
+@app.head("/metrics")
 def get_metrics():
     """Prometheus-style metrics endpoint for monitoring."""
     return {
