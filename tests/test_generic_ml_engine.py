@@ -19,14 +19,16 @@ from src.train import train_and_evaluate
 def regression_dataset():
     np.random.seed(42)
     n = 120
-    df = pd.DataFrame({
-        "house_id": [f"H_{i:04d}" for i in range(n)],
-        "square_feet": np.random.uniform(500, 3500, size=n),
-        "bedrooms": np.random.randint(1, 6, size=n),
-        "location": np.random.choice(["Urban", "Suburban", "Rural"], size=n),
-        "has_garage": np.random.choice(["Yes", "No"], size=n),
-        "sale_price": np.random.uniform(100000, 800000, size=n),
-    })
+    df = pd.DataFrame(
+        {
+            "house_id": [f"H_{i:04d}" for i in range(n)],
+            "square_feet": np.random.uniform(500, 3500, size=n),
+            "bedrooms": np.random.randint(1, 6, size=n),
+            "location": np.random.choice(["Urban", "Suburban", "Rural"], size=n),
+            "has_garage": np.random.choice(["Yes", "No"], size=n),
+            "sale_price": np.random.uniform(100000, 800000, size=n),
+        }
+    )
     return df
 
 
@@ -82,13 +84,15 @@ def test_infinities_and_missing_values_end_to_end(tmp_path):
     """Test full training and prediction pipeline on dataset containing inf, -inf, NaNs, None, and string 'nan'."""
     np.random.seed(99)
     n = 100
-    df = pd.DataFrame({
-        "user_id": [f"U_{i:03d}" for i in range(n)],
-        "feature_num_1": np.random.choice([10.0, np.nan, 45.5, 80.0], size=n),
-        "feature_num_2": np.random.uniform(1.0, 100.0, size=n),
-        "feature_cat_1": np.random.choice(["Alpha", "Beta", "Gamma", "nan", None], size=n),
-        "Churn": np.random.choice(["Yes", "No", "Yes", "No", np.nan], size=n),
-    })
+    df = pd.DataFrame(
+        {
+            "user_id": [f"U_{i:03d}" for i in range(n)],
+            "feature_num_1": np.random.choice([10.0, np.nan, 45.5, 80.0], size=n),
+            "feature_num_2": np.random.uniform(1.0, 100.0, size=n),
+            "feature_cat_1": np.random.choice(["Alpha", "Beta", "Gamma", "nan", None], size=n),
+            "Churn": np.random.choice(["Yes", "No", "Yes", "No", np.nan], size=n),
+        }
+    )
 
     # Set some inf/-inf explicitly
     df.loc[3, "feature_num_2"] = np.inf

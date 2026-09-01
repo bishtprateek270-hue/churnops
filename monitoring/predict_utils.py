@@ -38,7 +38,11 @@ def validate_upload(df: pd.DataFrame, target_col: str | None = None) -> tuple[bo
         found_target = find_target_col(df, target_col)
         has_target = found_target is not None and found_target in df.columns
         validate_data(df, is_training=has_target, target_col=target_col)
-        msg = f"Dataset passed validation. Target column detected: '{found_target}'." if has_target else "Dataset passed validation (inference mode)."
+        msg = (
+            f"Dataset passed validation. Target column detected: '{found_target}'."
+            if has_target
+            else "Dataset passed validation (inference mode)."
+        )
         return True, msg
     except DataValidationError as exc:
         return False, str(exc)
@@ -126,12 +130,14 @@ def predict_customers(df: pd.DataFrame, model=None, preprocessor=None, threshold
 
         if actual is not None:
             if actual.dtype == object or str(actual.dtype) in ["string", "category", "bool"]:
-                actual_binary = np.where(actual.astype(str).str.strip().str.lower().isin(["yes", "true", "1", "churn", "churned"]), 1, 0)
+                actual_binary = np.where(
+                    actual.astype(str).str.strip().str.lower().isin(["yes", "true", "1", "churn", "churned"]), 1, 0
+                )
             else:
                 actual_num = pd.to_numeric(actual, errors="coerce").fillna(0.0)
                 actual_binary = np.where(actual_num.values > 0.5, 1, 0)
             results["actual_churn"] = actual
-            results["prediction_correct"] = (predictions == actual_binary)
+            results["prediction_correct"] = predictions == actual_binary
     else:
         predictions = model.predict(X)
         results["predicted_value"] = predictions.round(4)
@@ -153,4 +159,3 @@ def predict_single_row(row: pd.Series | dict, model=None, preprocessor=None, thr
     results = predict_customers(df, model=model, preprocessor=preprocessor, threshold=threshold)
     row_result = results.iloc[0]
     return row_result.to_dict()
-

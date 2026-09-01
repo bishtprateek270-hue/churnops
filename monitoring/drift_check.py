@@ -90,7 +90,7 @@ def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH
     if not os.path.exists(db_path):
         return {
             "status": "error",
-            "message": f"No inference logs found at {db_path}. Submit prediction requests first."
+            "message": f"No inference logs found at {db_path}. Submit prediction requests first.",
         }
 
     # Load reference training data
@@ -102,10 +102,7 @@ def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH
     conn.close()
 
     if df_act.empty:
-        return {
-            "status": "error",
-            "message": "SQLite predictions table is empty."
-        }
+        return {"status": "error", "message": "SQLite predictions table is empty."}
 
     total_logged_requests = len(df_act)
     print(f"Running data drift check on {total_logged_requests} production prediction logs...")
@@ -140,7 +137,7 @@ def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH
                 "psi": round(psi, 4),
                 "ks_stat": round(ks_stat, 4),
                 "ks_pvalue": round(ks_pval, 4),
-                "status": status_str
+                "status": status_str,
             }
 
     # Check categorical features
@@ -162,7 +159,7 @@ def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH
                 "psi": round(psi, 4),
                 "ks_stat": None,
                 "ks_pvalue": None,
-                "status": status_str
+                "status": status_str,
             }
 
     report = {
@@ -170,7 +167,7 @@ def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH
         "total_requests": total_logged_requests,
         "max_psi": round(max_psi, 4),
         "drift_alert": drift_detected,
-        "feature_metrics": feature_metrics
+        "feature_metrics": feature_metrics,
     }
 
     print("\n--- Data Drift Analysis Summary ---")

@@ -16,15 +16,17 @@ from src.train import train_and_evaluate
 def custom_dataset():
     np.random.seed(42)
     n = 100
-    df = pd.DataFrame({
-        "user_id": [f"USR_{i:04d}" for i in range(n)],
-        "age": np.random.randint(18, 70, size=n),
-        "monthly_income": np.random.uniform(2000.0, 15000.0, size=n),
-        "plan_type": np.random.choice(["Basic", "Premium", "Enterprise"], size=n),
-        "is_active": np.random.choice(["Yes", "No"], size=n),
-        "support_tickets": np.random.randint(0, 10, size=n),
-        "target": np.random.choice([0, 1], size=n, p=[0.7, 0.3]),
-    })
+    df = pd.DataFrame(
+        {
+            "user_id": [f"USR_{i:04d}" for i in range(n)],
+            "age": np.random.randint(18, 70, size=n),
+            "monthly_income": np.random.uniform(2000.0, 15000.0, size=n),
+            "plan_type": np.random.choice(["Basic", "Premium", "Enterprise"], size=n),
+            "is_active": np.random.choice(["Yes", "No"], size=n),
+            "support_tickets": np.random.randint(0, 10, size=n),
+            "target": np.random.choice([0, 1], size=n, p=[0.7, 0.3]),
+        }
+    )
     return df
 
 
@@ -54,7 +56,13 @@ def test_custom_dataset_training_and_prediction(custom_dataset, tmp_path):
     custom_dataset.to_csv(csv_path, index=False)
 
     train_res = train_and_evaluate(data_path=str(csv_path), target_col="target", fast_mode=True)
-    assert train_res["best_model_name"] in ["Logistic_Regression", "Random_Forest", "HistGradientBoosting", "XGBoost", "CatBoost"]
+    assert train_res["best_model_name"] in [
+        "Logistic_Regression",
+        "Random_Forest",
+        "HistGradientBoosting",
+        "XGBoost",
+        "CatBoost",
+    ]
 
     # Test batch predictions on new sample rows
     sample_test = custom_dataset.drop(columns=["target"]).head(10)

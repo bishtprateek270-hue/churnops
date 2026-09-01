@@ -51,27 +51,79 @@ def is_identifier_column(df: pd.DataFrame, col: str) -> bool:
 
     # Common false positive words containing "id" substring that are valid features
     false_positives = {
-        "fluid", "solid", "liquid", "hybrid", "valid", "invalid", "grid",
-        "pyramid", "squid", "asteroid", "android", "centroid", "humanoid", "orchid", "idea", "ideology"
+        "fluid",
+        "solid",
+        "liquid",
+        "hybrid",
+        "valid",
+        "invalid",
+        "grid",
+        "pyramid",
+        "squid",
+        "asteroid",
+        "android",
+        "centroid",
+        "humanoid",
+        "orchid",
+        "idea",
+        "ideology",
     }
     if col_lower in false_positives:
         return False
 
     # Check if column name strongly indicates an identifier token/suffix
     known_id_names = {
-        "id", "id_num", "uuid", "hash", "key", "guid", "index", "rownumber",
-        "row_num", "row_id", "record_id", "customerid", "customer_id", "userid", "user_id",
-        "transactionid", "transaction_id", "houseid", "house_id", "buildingid", "building_id",
-        "orderid", "order_id", "patientid", "patient_id", "accountid", "account_id", "memberid", "member_id",
-        "clientid", "client_id", "subjectid", "subject_id", "itemid", "item_id", "productid", "product_id",
-        "sessionid", "session_id", "sub_id", "serial", "serial_number", "serialnumber", "serial_num"
+        "id",
+        "id_num",
+        "uuid",
+        "hash",
+        "key",
+        "guid",
+        "index",
+        "rownumber",
+        "row_num",
+        "row_id",
+        "record_id",
+        "customerid",
+        "customer_id",
+        "userid",
+        "user_id",
+        "transactionid",
+        "transaction_id",
+        "houseid",
+        "house_id",
+        "buildingid",
+        "building_id",
+        "orderid",
+        "order_id",
+        "patientid",
+        "patient_id",
+        "accountid",
+        "account_id",
+        "memberid",
+        "member_id",
+        "clientid",
+        "client_id",
+        "subjectid",
+        "subject_id",
+        "itemid",
+        "item_id",
+        "productid",
+        "product_id",
+        "sessionid",
+        "session_id",
+        "sub_id",
+        "serial",
+        "serial_number",
+        "serialnumber",
+        "serial_num",
     }
 
     is_id_name = (
         col_lower in known_id_names
         or col_lower.endswith(("_id", "-id", "_key", "_uuid", "_hash", "_index", "_serial"))
         or col_lower.startswith(("id_", "id-", "uuid_", "serial_", "index_"))
-        or bool(re.search(r'(^|_|-|[a-z])(id|uuid|guid|hash|key|index|serial)s?$', col_lower))
+        or bool(re.search(r"(^|_|-|[a-z])(id|uuid|guid|hash|key|index|serial)s?$", col_lower))
     )
 
     # Monotonicity check for numerical series
@@ -185,7 +237,9 @@ class GenericFeatureEngineer(BaseEstimator, TransformerMixin):
             target_cats = known_cats if known_cats else cat_cols_in_x
             for c in target_cats:
                 if c in X_out.columns:
-                    is_valid = X_out[c].notna() & (~X_out[c].astype(str).str.strip().str.lower().isin(["no", "none", "false", "0", "nan", ""]))
+                    is_valid = X_out[c].notna() & (
+                        ~X_out[c].astype(str).str.strip().str.lower().isin(["no", "none", "false", "0", "nan", ""])
+                    )
                     non_null_counts += np.where(is_valid, 1.0, 0.0)
             X_out["active_cat_features_count"] = non_null_counts
 
@@ -228,24 +282,25 @@ def build_preprocessor(
 
     transformers = []
     if num_cols:
-        num_pipeline = Pipeline([
-            ("imputer", SimpleImputer(strategy="median")),
-            ("scaler", StandardScaler())
-        ])
+        num_pipeline = Pipeline([("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler())])
         transformers.append(("num", num_pipeline, num_cols))
 
     if cat_low_cols:
-        cat_low_pipeline = Pipeline([
-            ("imputer", SimpleImputer(strategy="most_frequent")),
-            ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
-        ])
+        cat_low_pipeline = Pipeline(
+            [
+                ("imputer", SimpleImputer(strategy="most_frequent")),
+                ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+            ]
+        )
         transformers.append(("cat_low", cat_low_pipeline, cat_low_cols))
 
     if cat_high_cols:
-        cat_high_pipeline = Pipeline([
-            ("imputer", SimpleImputer(strategy="most_frequent")),
-            ("encoder", OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1))
-        ])
+        cat_high_pipeline = Pipeline(
+            [
+                ("imputer", SimpleImputer(strategy="most_frequent")),
+                ("encoder", OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)),
+            ]
+        )
         transformers.append(("cat_high", cat_high_pipeline, cat_high_cols))
 
     preprocessor = ColumnTransformer(transformers=transformers)
@@ -277,9 +332,22 @@ def find_target_col(df: pd.DataFrame, target_col: str | None = None, allow_fallb
         return target_col
 
     candidates = [
-        "churn", "target", "label", "class", "is_churned", "exited", "survived",
-        "outcome", "response", "price", "sale_price", "saleprice", "salary", "value",
-        "target_class", "target_value"
+        "churn",
+        "target",
+        "label",
+        "class",
+        "is_churned",
+        "exited",
+        "survived",
+        "outcome",
+        "response",
+        "price",
+        "sale_price",
+        "saleprice",
+        "salary",
+        "value",
+        "target_class",
+        "target_value",
     ]
     for c in candidates:
         for col in df.columns:
@@ -373,11 +441,13 @@ def prepare_data(
         cat_high_cols = [c for c in cat_cols if X_engineered[c].nunique() > 20]
 
         column_trans = build_preprocessor(num_cols=num_cols, cat_low_cols=cat_low_cols, cat_high_cols=cat_high_cols)
-        pipeline = Pipeline([
-            ("feature_engineer", GenericFeatureEngineer()),
-            ("column_transformer", column_trans),
-            ("variance_selector", VarianceThreshold(threshold=0.0))
-        ])
+        pipeline = Pipeline(
+            [
+                ("feature_engineer", GenericFeatureEngineer()),
+                ("column_transformer", column_trans),
+                ("variance_selector", VarianceThreshold(threshold=0.0)),
+            ]
+        )
         pipeline.fit(X_df)
         X_trans = pipeline.transform(X_df)
 

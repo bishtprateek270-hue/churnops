@@ -14,11 +14,25 @@ class DataValidationError(Exception):
 
 
 REQUIRED_COLUMNS = [
-    "gender", "SeniorCitizen", "Partner", "Dependents", "tenure",
-    "PhoneService", "MultipleLines", "InternetService", "OnlineSecurity",
-    "OnlineBackup", "DeviceProtection", "TechSupport", "StreamingTV",
-    "StreamingMovies", "Contract", "PaperlessBilling", "PaymentMethod",
-    "MonthlyCharges", "TotalCharges"
+    "gender",
+    "SeniorCitizen",
+    "Partner",
+    "Dependents",
+    "tenure",
+    "PhoneService",
+    "MultipleLines",
+    "InternetService",
+    "OnlineSecurity",
+    "OnlineBackup",
+    "DeviceProtection",
+    "TechSupport",
+    "StreamingTV",
+    "StreamingMovies",
+    "Contract",
+    "PaperlessBilling",
+    "PaymentMethod",
+    "MonthlyCharges",
+    "TotalCharges",
 ]
 
 
@@ -99,7 +113,9 @@ class DataValidator:
         if len(valid_targets) < 2:
             raise DataValidationError(f"Target column '{target_name}' must contain at least 2 non-null observations.")
         if valid_targets.nunique() <= 1:
-            raise DataValidationError(f"Target column '{target_name}' is constant (only 1 unique value). Training requires target variance.")
+            raise DataValidationError(
+                f"Target column '{target_name}' is constant (only 1 unique value). Training requires target variance."
+            )
 
 
 def validate_data(

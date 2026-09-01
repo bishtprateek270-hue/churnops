@@ -23,6 +23,7 @@ def test_data_validation_success(valid_sample_df):
 def test_missing_column_raises_error(valid_sample_df):
     """Test that missing required columns raise DataValidationError."""
     from src.data_validation import REQUIRED_COLUMNS
+
     df_missing = valid_sample_df.drop(columns=["MonthlyCharges"])
     with pytest.raises(DataValidationError, match="Missing required columns"):
         validate_data(df_missing, is_training=True, required_columns=REQUIRED_COLUMNS)
@@ -39,6 +40,7 @@ def test_invalid_numerical_range(valid_sample_df):
 def test_invalid_categorical_value(valid_sample_df):
     """Test that invalid categorical options raise DataValidationError."""
     from src.data_validation import REQUIRED_COLUMNS
+
     df_invalid = valid_sample_df.copy()
     df_invalid.loc[0, "Contract"] = "Super Long Term"
     with pytest.raises(DataValidationError, match="invalid categorical values"):

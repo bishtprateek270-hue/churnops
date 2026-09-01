@@ -32,10 +32,7 @@ from src.data_validation import DataValidationError, validate_data
 from src.preprocessing import load_preprocessor, prepare_data
 
 # Configure structured logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Configuration
@@ -48,13 +45,7 @@ ENABLE_CORS = settings.ENABLE_CORS
 CORS_ORIGINS = settings.CORS_ORIGINS
 
 # Global state loaded during lifespan
-model_store = {
-    "model": None,
-    "preprocessor": None,
-    "version": "unknown",
-    "stage": "none",
-    "loaded_at": None
-}
+model_store = {"model": None, "preprocessor": None, "version": "unknown", "stage": "none", "loaded_at": None}
 
 # Rate limiting storage (in production, use Redis)
 request_counts = {}
@@ -106,7 +97,7 @@ def log_prediction_to_db(
     probability: float,
     model_version: str,
     request_id: str,
-    processing_time_ms: float
+    processing_time_ms: float,
 ):
     """Log prediction request and model result to SQLite database."""
     try:
@@ -114,7 +105,8 @@ def log_prediction_to_db(
         cursor = conn.cursor()
         now_iso = datetime.now(timezone.utc).isoformat()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO predictions (
                 request_id, timestamp, gender, SeniorCitizen, Partner, Dependents, tenure,
                 PhoneService, MultipleLines, InternetService, OnlineSecurity,
@@ -123,33 +115,35 @@ def log_prediction_to_db(
                 MonthlyCharges, TotalCharges, churn_prediction, churn_probability,
                 model_version, processing_time_ms
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            request_id,
-            now_iso,
-            input_dict.get("gender"),
-            input_dict.get("SeniorCitizen"),
-            input_dict.get("Partner"),
-            input_dict.get("Dependents"),
-            input_dict.get("tenure"),
-            input_dict.get("PhoneService"),
-            input_dict.get("MultipleLines"),
-            input_dict.get("InternetService"),
-            input_dict.get("OnlineSecurity"),
-            input_dict.get("OnlineBackup"),
-            input_dict.get("DeviceProtection"),
-            input_dict.get("TechSupport"),
-            input_dict.get("StreamingTV"),
-            input_dict.get("StreamingMovies"),
-            input_dict.get("Contract"),
-            input_dict.get("PaperlessBilling"),
-            input_dict.get("PaymentMethod"),
-            input_dict.get("MonthlyCharges"),
-            input_dict.get("TotalCharges"),
-            prediction,
-            probability,
-            model_version,
-            processing_time_ms
-        ))
+        """,
+            (
+                request_id,
+                now_iso,
+                input_dict.get("gender"),
+                input_dict.get("SeniorCitizen"),
+                input_dict.get("Partner"),
+                input_dict.get("Dependents"),
+                input_dict.get("tenure"),
+                input_dict.get("PhoneService"),
+                input_dict.get("MultipleLines"),
+                input_dict.get("InternetService"),
+                input_dict.get("OnlineSecurity"),
+                input_dict.get("OnlineBackup"),
+                input_dict.get("DeviceProtection"),
+                input_dict.get("TechSupport"),
+                input_dict.get("StreamingTV"),
+                input_dict.get("StreamingMovies"),
+                input_dict.get("Contract"),
+                input_dict.get("PaperlessBilling"),
+                input_dict.get("PaymentMethod"),
+                input_dict.get("MonthlyCharges"),
+                input_dict.get("TotalCharges"),
+                prediction,
+                probability,
+                model_version,
+                processing_time_ms,
+            ),
+        )
         conn.commit()
         conn.close()
         logger.debug(f"Prediction logged to database: {request_id}")
@@ -212,8 +206,7 @@ def check_rate_limit(request: Request):
     if client_ip in request_counts:
         if request_counts[client_ip] >= RATE_LIMIT_PER_MINUTE:
             raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Rate limit exceeded. Please try again later."
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded. Please try again later."
             )
 
     request_counts[client_ip] = request_counts.get(client_ip, 0) + 1
@@ -223,17 +216,11 @@ async def get_api_key(api_key: str | None = Depends(APIKeyHeader)):
     """Validate API key if authentication is enabled."""
     if os.getenv("ENABLE_AUTH", "false").lower() == "true":
         if not api_key:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="API key is required"
-            )
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key is required")
         # In production, validate against a secure store
         expected_key = os.getenv("API_KEY_SECRET")
         if expected_key and api_key != expected_key:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid API key"
-            )
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
     return api_key
 
 
@@ -256,7 +243,7 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
 )
 
 # Add CORS middleware
@@ -302,7 +289,7 @@ def health_check():
         model_version=model_store["version"],
         model_loaded_at=model_store.get("loaded_at", "unknown"),
         preprocessor_loaded=preprocessor_loaded,
-        timestamp=datetime.now(timezone.utc).isoformat()
+        timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
 
@@ -313,8 +300,9 @@ def get_metrics():
         "model_version": model_store["version"],
         "model_stage": model_store["stage"],
         "model_loaded": model_store["model"] is not None,
-        "uptime_seconds": time.time() - (model_store.get("loaded_at", time.time()) if model_store.get("loaded_at") else time.time()),
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "uptime_seconds": time.time()
+        - (model_store.get("loaded_at", time.time()) if model_store.get("loaded_at") else time.time()),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -330,7 +318,7 @@ async def predict_churn(payload: ChurnInput, request: Request):
     if model_store["model"] is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Model is not currently loaded. Please check the health endpoint."
+            detail="Model is not currently loaded. Please check the health endpoint.",
         )
 
     # Convert payload to DataFrame
@@ -342,10 +330,7 @@ async def predict_churn(payload: ChurnInput, request: Request):
         validate_data(df_input, is_training=False)
     except DataValidationError as e:
         logger.warning(f"Data validation failed for request {request_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e)
-        ) from e
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
 
     # Transform features
     try:
@@ -356,8 +341,7 @@ async def predict_churn(payload: ChurnInput, request: Request):
     except Exception as e:
         logger.error(f"Preprocessing error for request {request_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Preprocessing error: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Preprocessing error: {str(e)}"
         ) from e
 
     # Predict
@@ -375,8 +359,7 @@ async def predict_churn(payload: ChurnInput, request: Request):
     except Exception as e:
         logger.error(f"Inference error for request {request_id}: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Inference error: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Inference error: {str(e)}"
         ) from e
 
     label = "Yes" if pred_class == 1 else "No"
@@ -397,7 +380,7 @@ async def predict_churn(payload: ChurnInput, request: Request):
         model_version=model_store["version"],
         timestamp=now_iso,
         request_id=request_id,
-        processing_time_ms=round(processing_time_ms, 2)
+        processing_time_ms=round(processing_time_ms, 2),
     )
 
 
@@ -409,15 +392,11 @@ async def predict_churn_batch(payload: BatchChurnInput, request: Request):
 
     if len(payload.customers) > 100:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Batch size exceeds maximum of 100 customers"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Batch size exceeds maximum of 100 customers"
         )
 
     if model_store["model"] is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Model is not currently loaded."
-        )
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Model is not currently loaded.")
 
     results = []
     errors = []
@@ -448,24 +427,27 @@ async def predict_churn_batch(payload: BatchChurnInput, request: Request):
                 pred_class = int(prob > 0.5)
 
             label = "Yes" if pred_class == 1 else "No"
-            results.append({
-                "index": idx,
-                "churn_prediction": pred_class,
-                "churn_label": label,
-                "churn_probability": round(prob, 4)
-            })
+            results.append(
+                {
+                    "index": idx,
+                    "churn_prediction": pred_class,
+                    "churn_label": label,
+                    "churn_probability": round(prob, 4),
+                }
+            )
 
             # Log to DB
             log_prediction_to_db(
-                input_dict, pred_class, prob, model_store["version"],
-                f"{request_id}_{idx}", (time.time() - start_time) * 1000
+                input_dict,
+                pred_class,
+                prob,
+                model_store["version"],
+                f"{request_id}_{idx}",
+                (time.time() - start_time) * 1000,
             )
 
         except Exception as e:
-            errors.append({
-                "index": idx,
-                "error": str(e)
-            })
+            errors.append({"index": idx, "error": str(e)})
 
     processing_time_ms = (time.time() - start_time) * 1000
 
@@ -477,7 +459,7 @@ async def predict_churn_batch(payload: BatchChurnInput, request: Request):
         model_version=model_store["version"],
         timestamp=datetime.now(timezone.utc).isoformat(),
         request_id=request_id,
-        processing_time_ms=round(processing_time_ms, 2)
+        processing_time_ms=round(processing_time_ms, 2),
     )
 
 
@@ -486,11 +468,7 @@ async def data_validation_exception_handler(request: Request, exc: DataValidatio
     """Custom exception handler for data validation errors."""
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={
-            "detail": str(exc),
-            "error_type": "DataValidationError",
-            "request_id": request.state.request_id
-        }
+        content={"detail": str(exc), "error_type": "DataValidationError", "request_id": request.state.request_id},
     )
 
 
@@ -499,11 +477,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     """Custom exception handler for HTTP exceptions."""
     return JSONResponse(
         status_code=exc.status_code,
-        content={
-            "detail": exc.detail,
-            "error_type": "HTTPException",
-            "request_id": request.state.request_id
-        }
+        content={"detail": exc.detail, "error_type": "HTTPException", "request_id": request.state.request_id},
     )
 
 
@@ -516,6 +490,6 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={
             "detail": "An internal server error occurred",
             "error_type": "InternalError",
-            "request_id": request.state.request_id
-        }
+            "request_id": request.state.request_id,
+        },
     )

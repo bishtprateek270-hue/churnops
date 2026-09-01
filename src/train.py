@@ -67,11 +67,7 @@ def setup_mlflow():
 
 
 def run_optuna_tuning(
-    model_name: str,
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    task_type: str = "classification",
-    n_trials: int = 5
+    model_name: str, X_train: np.ndarray, y_train: np.ndarray, task_type: str = "classification", n_trials: int = 5
 ) -> dict:
     """Perform Stratified K-Fold CV (Classification) or K-Fold CV (Regression) Hyperparameter Tuning with Optuna."""
     optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -86,7 +82,9 @@ def run_optuna_tuning(
             elif model_name == "Random_Forest":
                 n_est = trial.suggest_int("n_estimators", 50, 150)
                 max_d = trial.suggest_int("max_depth", 3, 10)
-                clf = RandomForestClassifier(n_estimators=n_est, max_depth=max_d, n_jobs=-1, random_state=42, class_weight="balanced")
+                clf = RandomForestClassifier(
+                    n_estimators=n_est, max_depth=max_d, n_jobs=-1, random_state=42, class_weight="balanced"
+                )
             elif model_name == "HistGradientBoosting":
                 lr = trial.suggest_float("learning_rate", 0.01, 0.2, log=True)
                 max_d = trial.suggest_int("max_depth", 3, 8)
@@ -95,19 +93,25 @@ def run_optuna_tuning(
                 n_est = trial.suggest_int("n_estimators", 50, 150)
                 max_d = trial.suggest_int("max_depth", 3, 8)
                 lr = trial.suggest_float("learning_rate", 0.01, 0.2, log=True)
-                clf = XGBClassifier(n_estimators=n_est, max_depth=max_d, learning_rate=lr, n_jobs=-1, random_state=42, eval_metric="logloss")
+                clf = XGBClassifier(
+                    n_estimators=n_est,
+                    max_depth=max_d,
+                    learning_rate=lr,
+                    n_jobs=-1,
+                    random_state=42,
+                    eval_metric="logloss",
+                )
             elif model_name == "CatBoost":
                 iters = trial.suggest_int("iterations", 50, 150)
                 depth = trial.suggest_int("depth", 3, 8)
                 lr = trial.suggest_float("learning_rate", 0.01, 0.2, log=True)
-                clf = CatBoostClassifier(iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=-1)
+                clf = CatBoostClassifier(
+                    iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=-1
+                )
             else:
                 clf = LogisticRegression(max_iter=1000, random_state=42)
 
-            pipeline = ImbPipeline([
-                ("smote", SMOTE(random_state=42)),
-                ("classifier", clf)
-            ])
+            pipeline = ImbPipeline([("smote", SMOTE(random_state=42)), ("classifier", clf)])
 
             scores = []
             for train_idx, val_idx in skf.split(X_train, y_train):
@@ -117,7 +121,9 @@ def run_optuna_tuning(
                 try:
                     pipeline.fit(X_tr, y_tr)
                     y_prob = pipeline.predict_proba(X_val)[:, 1]
-                    metrics = calculate_all_metrics(y_val, np.where(y_prob > 0.5, 1, 0), y_prob, task_type="classification")
+                    metrics = calculate_all_metrics(
+                        y_val, np.where(y_prob > 0.5, 1, 0), y_prob, task_type="classification"
+                    )
                     scores.append(metrics["pr_auc"])
                 except Exception:
                     scores.append(0.0)
@@ -151,7 +157,9 @@ def run_optuna_tuning(
                 iters = trial.suggest_int("iterations", 50, 150)
                 depth = trial.suggest_int("depth", 3, 8)
                 lr = trial.suggest_float("learning_rate", 0.01, 0.2, log=True)
-                reg = CatBoostRegressor(iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=-1)
+                reg = CatBoostRegressor(
+                    iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=-1
+                )
             else:
                 reg = Ridge(random_state=42)
 
@@ -192,6 +200,7 @@ def train_and_evaluate(
     if not os.path.exists(data_path):
         print(f"Dataset not found at {data_path}. Generating default telco dataset...")
         from data.generate_dataset import generate_telco_churn_data
+
         df = generate_telco_churn_data()
         if "/" in data_path or "\\" in data_path:
             os.makedirs(os.path.dirname(data_path), exist_ok=True)
@@ -201,7 +210,13 @@ def train_and_evaluate(
         df = pd.read_csv(data_path)
 
     os.makedirs(settings.REPORTS_PLOTS_DIR, exist_ok=True)
-    for p_name in ["confusion_matrix.png", "roc_curve.png", "pr_curve.png", "calibration_curve.png", "shap_summary.png"]:
+    for p_name in [
+        "confusion_matrix.png",
+        "roc_curve.png",
+        "pr_curve.png",
+        "calibration_curve.png",
+        "shap_summary.png",
+    ]:
         p_file = os.path.join(settings.REPORTS_PLOTS_DIR, p_name)
         if os.path.exists(p_file):
             try:
@@ -284,7 +299,14 @@ def train_and_evaluate(
     # 3. Split BEFORE Fitting Preprocessor to Prevent Data Leakage
     print("Splitting raw dataset into Train (70%), Val (15%), Test (15%) BEFORE preprocessing...")
     stratify_arg = None
-    if task_type == "classification" and y is not None and len(np.unique(y)) > 1 and len(y) >= 20 and np.issubdtype(y.dtype, np.integer) and np.min(np.bincount(y)) >= 2:
+    if (
+        task_type == "classification"
+        and y is not None
+        and len(np.unique(y)) > 1
+        and len(y) >= 20
+        and np.issubdtype(y.dtype, np.integer)
+        and np.min(np.bincount(y)) >= 2
+    ):
         stratify_arg = y
 
     X_train_raw, X_temp_raw, y_train, y_temp = train_test_split(
@@ -292,7 +314,14 @@ def train_and_evaluate(
     )
 
     stratify_temp = None
-    if task_type == "classification" and y_temp is not None and len(np.unique(y_temp)) > 1 and len(y_temp) >= 10 and np.issubdtype(y_temp.dtype, np.integer) and np.min(np.bincount(y_temp)) >= 2:
+    if (
+        task_type == "classification"
+        and y_temp is not None
+        and len(np.unique(y_temp)) > 1
+        and len(y_temp) >= 10
+        and np.issubdtype(y_temp.dtype, np.integer)
+        and np.min(np.bincount(y_temp)) >= 2
+    ):
         stratify_temp = y_temp
 
     X_val_raw, X_test_raw, y_val, y_test = train_test_split(
@@ -340,10 +369,16 @@ def train_and_evaluate(
     print(f"\n--- Model Suite CV Evaluation (Fast Mode: {fast_mode}) ---")
     for idx, name in enumerate(candidate_models):
         if progress_callback:
-            progress_callback(30 + int(idx * 8), f"Evaluating model candidate {idx+1}/{len(candidate_models)}: {name}...")
+            progress_callback(
+                30 + int(idx * 8), f"Evaluating model candidate {idx + 1}/{len(candidate_models)}: {name}..."
+            )
 
         with mlflow.start_run(run_name=name) as run:
-            best_params = {} if fast_mode else run_optuna_tuning(name, X_train, y_train, task_type=task_type, n_trials=n_optuna_trials)
+            best_params = (
+                {}
+                if fast_mode
+                else run_optuna_tuning(name, X_train, y_train, task_type=task_type, n_trials=n_optuna_trials)
+            )
 
             if task_type == "classification":
                 try:
@@ -357,7 +392,13 @@ def train_and_evaluate(
                         params = {"learning_rate": 0.1, "max_depth": 6, **best_params}
                         base_clf = HistGradientBoostingClassifier(**params, random_state=42)
                     elif name == "XGBoost":
-                        params = {"n_estimators": 100, "max_depth": 6, "learning_rate": 0.1, "eval_metric": "logloss", **best_params}
+                        params = {
+                            "n_estimators": 100,
+                            "max_depth": 6,
+                            "learning_rate": 0.1,
+                            "eval_metric": "logloss",
+                            **best_params,
+                        }
                         base_clf = XGBClassifier(**params, n_jobs=-1, random_state=42)
                     elif name == "CatBoost":
                         params = {"iterations": 100, "depth": 6, "learning_rate": 0.1, "verbose": 0, **best_params}
@@ -366,13 +407,10 @@ def train_and_evaluate(
                         base_clf = LogisticRegression(max_iter=1000, random_state=42)
 
                     pos_ratio = float(np.mean(y_train == 1)) if len(y_train) > 0 else 0.5
-                    is_imbalanced = (pos_ratio < 0.35 or pos_ratio > 0.65)
-                    use_smote = (is_imbalanced and len(y_train) >= 20 and np.min(np.bincount(y_train)) >= 2)
+                    is_imbalanced = pos_ratio < 0.35 or pos_ratio > 0.65
+                    use_smote = is_imbalanced and len(y_train) >= 20 and np.min(np.bincount(y_train)) >= 2
                     if use_smote and name not in ["HistGradientBoosting"]:
-                        model_pipeline = ImbPipeline([
-                            ("smote", SMOTE(random_state=42)),
-                            ("classifier", base_clf)
-                        ])
+                        model_pipeline = ImbPipeline([("smote", SMOTE(random_state=42)), ("classifier", base_clf)])
                     else:
                         model_pipeline = Pipeline([("classifier", base_clf)])
 
@@ -384,9 +422,17 @@ def train_and_evaluate(
                     else:
                         y_val_prob = None
 
-                    opt_th, val_cost, _ = optimize_business_threshold(y_val, y_val_prob, cost_fn=1.0, cost_fp=1.0) if y_val_prob is not None else (0.5, 0.0, {})
+                    opt_th, val_cost, _ = (
+                        optimize_business_threshold(y_val, y_val_prob, cost_fn=1.0, cost_fp=1.0)
+                        if y_val_prob is not None
+                        else (0.5, 0.0, {})
+                    )
                     eval_threshold = opt_th
-                    y_val_pred = np.where(y_val_prob >= eval_threshold, 1, 0) if y_val_prob is not None else final_model_obj.predict(X_val)
+                    y_val_pred = (
+                        np.where(y_val_prob >= eval_threshold, 1, 0)
+                        if y_val_prob is not None
+                        else final_model_obj.predict(X_val)
+                    )
                     val_metrics = calculate_all_metrics(y_val, y_val_pred, y_val_prob, task_type="classification")
 
                     cv_score = val_metrics["roc_auc"]
@@ -466,9 +512,15 @@ def train_and_evaluate(
             y_test_prob = None
 
         # Evaluate using threshold selected strictly from validation data (never tuned on holdout test set)
-        y_test_pred = np.where(y_test_prob >= best_threshold, 1, 0) if y_test_prob is not None else best_model_obj.predict(X_test)
+        y_test_pred = (
+            np.where(y_test_prob >= best_threshold, 1, 0) if y_test_prob is not None else best_model_obj.predict(X_test)
+        )
         best_test_metrics = calculate_all_metrics(y_test, y_test_pred, y_test_prob, task_type="classification")
-        _, best_business_cost, _ = optimize_business_threshold(y_test, y_test_prob, cost_fn=500.0, cost_fp=50.0) if y_test_prob is not None else (0.5, 0.0, {})
+        _, best_business_cost, _ = (
+            optimize_business_threshold(y_test, y_test_prob, cost_fn=500.0, cost_fp=50.0)
+            if y_test_prob is not None
+            else (0.5, 0.0, {})
+        )
 
         log_classification_plots(y_test, y_test_pred, y_test_prob, best_model_name)
         if y_test_prob is not None:
@@ -498,7 +550,7 @@ def train_and_evaluate(
             print(warn_msg)
             warnings_list.append(warn_msg)
 
-    _, shap_warn = generate_shap_plots(best_model_obj, X_test[:min(50, len(X_test))], feature_names)
+    _, shap_warn = generate_shap_plots(best_model_obj, X_test[: min(50, len(X_test))], feature_names)
     if shap_warn:
         warnings_list.append(shap_warn)
     t_plots = time.perf_counter() - t0_plots
@@ -516,10 +568,7 @@ def train_and_evaluate(
         registered_model = mlflow.register_model(model_uri, MODEL_NAME)
         client = mlflow.tracking.MlflowClient()
         client.transition_model_version_stage(
-            name=MODEL_NAME,
-            version=registered_model.version,
-            stage="Staging",
-            archive_existing_versions=False
+            name=MODEL_NAME, version=registered_model.version, stage="Staging", archive_existing_versions=False
         )
         registered_version = registered_model.version
     except Exception as exc:

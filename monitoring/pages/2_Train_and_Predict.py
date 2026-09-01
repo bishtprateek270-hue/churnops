@@ -37,7 +37,9 @@ if "target_col" not in st.session_state:
 if "train_result" not in st.session_state:
     st.session_state.train_result = None
 if "model_ready" not in st.session_state:
-    st.session_state.model_ready = os.path.exists("models/unified_pipeline.joblib") or os.path.exists("models/best_model.joblib")
+    st.session_state.model_ready = os.path.exists("models/unified_pipeline.joblib") or os.path.exists(
+        "models/best_model.joblib"
+    )
 
 st.subheader("1. Upload Dataset & Target Selection")
 uploaded_file = st.file_uploader(
@@ -69,15 +71,17 @@ if uploaded_file is not None:
         inferred_task = infer_task_type(df[st.session_state.target_col])
         is_id_target = is_identifier_column(df, st.session_state.target_col)
         if is_id_target:
-            st.warning(f"⚠️ Column `{st.session_state.target_col}` appears to be a unique row identifier, not a predictable target variable.")
+            st.warning(
+                f"⚠️ Column `{st.session_state.target_col}` appears to be a unique row identifier, not a predictable target variable."
+            )
             allow_id_target = st.checkbox(
-                "I understand and want to train on this identifier column anyway",
-                value=False,
-                key="id_target_chk"
+                "I understand and want to train on this identifier column anyway", value=False, key="id_target_chk"
             )
         else:
             allow_id_target = False
-            st.info(f"💡 Auto-detected Task Type: **{inferred_task.upper()}** for target `{st.session_state.target_col}`.")
+            st.info(
+                f"💡 Auto-detected Task Type: **{inferred_task.upper()}** for target `{st.session_state.target_col}`."
+            )
 
         is_valid, message = validate_upload(df, target_col=st.session_state.target_col)
         if is_valid:
@@ -105,7 +109,7 @@ else:
         options=["🚀 Fast Training Mode (Recommended, <15s)", "🔬 Advanced Optimization (Optuna HPO)"],
         index=0,
         horizontal=True,
-        help="Fast Mode evaluates candidate baseline models in parallel (<15 seconds). Advanced Mode runs Optuna HPO."
+        help="Fast Mode evaluates candidate baseline models in parallel (<15 seconds). Advanced Mode runs Optuna HPO.",
     )
     is_fast_mode = "Fast" in mode_selection
 
@@ -124,7 +128,9 @@ else:
 
         allow_id = st.session_state.get("id_target_chk", False)
         if selected_target and is_identifier_column(pd.read_csv(train_source), selected_target) and not allow_id:
-            st.error(f"⚠️ Training blocked: Column '{selected_target}' is a unique row identifier. Please select a valid target or check the override box.")
+            st.error(
+                f"⚠️ Training blocked: Column '{selected_target}' is a unique row identifier. Please select a valid target or check the override box."
+            )
             st.stop()
 
         status_box = st.status("Initializing Training Pipeline...", expanded=True)
@@ -144,8 +150,14 @@ else:
             )
             st.session_state.train_result = result
             st.session_state.model_ready = True
-            status_box.update(label=f"🎉 Training Complete in {result.get('total_time_seconds', 0)}s!", state="complete", expanded=False)
-            st.success(f"Training complete in **{result.get('total_time_seconds', 0)}s**! Pipeline saved to `models/unified_pipeline.joblib`.")
+            status_box.update(
+                label=f"🎉 Training Complete in {result.get('total_time_seconds', 0)}s!",
+                state="complete",
+                expanded=False,
+            )
+            st.success(
+                f"Training complete in **{result.get('total_time_seconds', 0)}s**! Pipeline saved to `models/unified_pipeline.joblib`."
+            )
         except Exception as exc:
             st.session_state.train_result = None
             status_box.update(label="⚠️ Training Failed", state="error")
@@ -171,7 +183,9 @@ if st.session_state.train_result:
         for w in warnings:
             st.warning(f"⚠️ {w}")
 
-    st.markdown(f"### 📊 Training Results (Holdout Test Set): Best Model — **{result['best_model_name'].replace('_', ' ')}**")
+    st.markdown(
+        f"### 📊 Training Results (Holdout Test Set): Best Model — **{result['best_model_name'].replace('_', ' ')}**"
+    )
     if result.get("total_time_seconds"):
         st.caption(
             f"⏱️ Runtime: **{result['total_time_seconds']}s** | Baseline Score: **{fmt_num(result.get('baseline_score'))}** | "
@@ -198,7 +212,9 @@ if st.session_state.train_result:
                 if os.path.exists("reports/plots/confusion_matrix.png"):
                     st.image("reports/plots/confusion_matrix.png", caption="Confusion Matrix", use_container_width=True)
                 elif os.path.exists("reports/plots/calibration_curve.png"):
-                    st.image("reports/plots/calibration_curve.png", caption="Calibration Curve", use_container_width=True)
+                    st.image(
+                        "reports/plots/calibration_curve.png", caption="Calibration Curve", use_container_width=True
+                    )
             with col_roc:
                 if os.path.exists("reports/plots/roc_curve.png"):
                     st.image("reports/plots/roc_curve.png", caption="ROC Curve", use_container_width=True)
@@ -207,7 +223,11 @@ if st.session_state.train_result:
 
         with tab_shap:
             if os.path.exists("reports/plots/shap_summary.png"):
-                st.image("reports/plots/shap_summary.png", caption="SHAP Summary Feature Importance", use_container_width=True)
+                st.image(
+                    "reports/plots/shap_summary.png",
+                    caption="SHAP Summary Feature Importance",
+                    use_container_width=True,
+                )
             else:
                 st.warning("⚠️ SHAP feature importance plot unavailable for this run.")
 
@@ -222,13 +242,15 @@ if st.session_state.train_result:
         m3.metric("R² Score", fmt_num(test_m.get("r2_score")))
         m4.metric("MLflow Version", result.get("version", "1"))
 
-        tab_shap, tab_compare = st.tabs(
-            ["🔍 SHAP & Feature Importance", "🏆 Model Suite Comparison"]
-        )
+        tab_shap, tab_compare = st.tabs(["🔍 SHAP & Feature Importance", "🏆 Model Suite Comparison"])
 
         with tab_shap:
             if os.path.exists("reports/plots/shap_summary.png"):
-                st.image("reports/plots/shap_summary.png", caption="SHAP Summary Feature Importance", use_container_width=True)
+                st.image(
+                    "reports/plots/shap_summary.png",
+                    caption="SHAP Summary Feature Importance",
+                    use_container_width=True,
+                )
             else:
                 st.info("SHAP plot was generated during training and logged to MLflow artifacts.")
 
@@ -257,7 +279,9 @@ if source_df is None and os.path.exists(UPLOAD_PATH):
 elif source_df is None and os.path.exists("data/raw/telco_churn.csv"):
     source_df = pd.read_csv("data/raw/telco_churn.csv")
 
-target_name = getattr(preprocessor, "target_col_", None) or (st.session_state.target_col if st.session_state.target_col else "Churn")
+target_name = getattr(preprocessor, "target_col_", None) or (
+    st.session_state.target_col if st.session_state.target_col else "Churn"
+)
 
 with predict_tab_single:
     if source_df is None:
@@ -294,9 +318,13 @@ with predict_tab_batch:
         st.warning("Upload a dataset for batch predictions.")
     else:
         try:
-            sample_size = st.slider("Rows to predict", min_value=5, max_value=min(500, len(source_df)), value=min(50, len(source_df)))
+            sample_size = st.slider(
+                "Rows to predict", min_value=5, max_value=min(500, len(source_df)), value=min(50, len(source_df))
+            )
             if st.button("Run Batch Prediction", key="predict_batch"):
-                batch_results = predict_customers(source_df.head(sample_size), model=model, preprocessor=preprocessor, threshold=opt_th)
+                batch_results = predict_customers(
+                    source_df.head(sample_size), model=model, preprocessor=preprocessor, threshold=opt_th
+                )
                 st.dataframe(batch_results, use_container_width=True)
         except Exception as exc:
             st.error(f"⚠️ Batch prediction error: {exc}")

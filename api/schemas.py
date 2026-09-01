@@ -2,78 +2,141 @@
 Pydantic schemas for FastAPI serving layer input/output validation.
 """
 
-
 from pydantic import BaseModel, Field, field_validator
 
 
 class ChurnInput(BaseModel):
-    gender: str = Field(..., json_schema_extra={"example": "Female"}, description="Gender of customer ('Male', 'Female')")
-    SeniorCitizen: int = Field(..., ge=0, le=1, json_schema_extra={"example": 0}, description="Whether customer is a senior citizen (0 or 1)")
-    Partner: str = Field(..., json_schema_extra={"example": "Yes"}, description="Whether customer has a partner ('Yes', 'No')")
-    Dependents: str = Field(..., json_schema_extra={"example": "No"}, description="Whether customer has dependents ('Yes', 'No')")
-    tenure: int = Field(..., ge=0, le=120, json_schema_extra={"example": 12}, description="Number of months customer has stayed with company")
-    PhoneService: str = Field(..., json_schema_extra={"example": "Yes"}, description="Whether customer has phone service ('Yes', 'No')")
-    MultipleLines: str = Field(..., json_schema_extra={"example": "No"}, description="Whether customer has multiple lines ('Yes', 'No', 'No phone service')")
-    InternetService: str = Field(..., json_schema_extra={"example": "DSL"}, description="Customer's internet service provider ('DSL', 'Fiber optic', 'No')")
-    OnlineSecurity: str = Field(..., json_schema_extra={"example": "No"}, description="Whether customer has online security ('Yes', 'No', 'No internet service')")
-    OnlineBackup: str = Field(..., json_schema_extra={"example": "Yes"}, description="Whether customer has online backup ('Yes', 'No', 'No internet service')")
-    DeviceProtection: str = Field(..., json_schema_extra={"example": "No"}, description="Whether customer has device protection ('Yes', 'No', 'No internet service')")
-    TechSupport: str = Field(..., json_schema_extra={"example": "No"}, description="Whether customer has tech support ('Yes', 'No', 'No internet service')")
-    StreamingTV: str = Field(..., json_schema_extra={"example": "No"}, description="Whether customer has streaming TV ('Yes', 'No', 'No internet service')")
-    StreamingMovies: str = Field(..., json_schema_extra={"example": "No"}, description="Whether customer has streaming movies ('Yes', 'No', 'No internet service')")
-    Contract: str = Field(..., json_schema_extra={"example": "Month-to-month"}, description="Contract term ('Month-to-month', 'One year', 'Two year')")
-    PaperlessBilling: str = Field(..., json_schema_extra={"example": "Yes"}, description="Whether customer has paperless billing ('Yes', 'No')")
-    PaymentMethod: str = Field(..., json_schema_extra={"example": "Electronic check"}, description="Payment method ('Electronic check', 'Mailed check', 'Bank transfer (automatic)', 'Credit card (automatic)')")
-    MonthlyCharges: float = Field(..., ge=0.0, le=300.0, json_schema_extra={"example": 65.50}, description="Monthly charge amount")
-    TotalCharges: float = Field(..., ge=0.0, json_schema_extra={"example": 786.00}, description="Total amount charged to customer")
+    gender: str = Field(
+        ..., json_schema_extra={"example": "Female"}, description="Gender of customer ('Male', 'Female')"
+    )
+    SeniorCitizen: int = Field(
+        ..., ge=0, le=1, json_schema_extra={"example": 0}, description="Whether customer is a senior citizen (0 or 1)"
+    )
+    Partner: str = Field(
+        ..., json_schema_extra={"example": "Yes"}, description="Whether customer has a partner ('Yes', 'No')"
+    )
+    Dependents: str = Field(
+        ..., json_schema_extra={"example": "No"}, description="Whether customer has dependents ('Yes', 'No')"
+    )
+    tenure: int = Field(
+        ...,
+        ge=0,
+        le=120,
+        json_schema_extra={"example": 12},
+        description="Number of months customer has stayed with company",
+    )
+    PhoneService: str = Field(
+        ..., json_schema_extra={"example": "Yes"}, description="Whether customer has phone service ('Yes', 'No')"
+    )
+    MultipleLines: str = Field(
+        ...,
+        json_schema_extra={"example": "No"},
+        description="Whether customer has multiple lines ('Yes', 'No', 'No phone service')",
+    )
+    InternetService: str = Field(
+        ...,
+        json_schema_extra={"example": "DSL"},
+        description="Customer's internet service provider ('DSL', 'Fiber optic', 'No')",
+    )
+    OnlineSecurity: str = Field(
+        ...,
+        json_schema_extra={"example": "No"},
+        description="Whether customer has online security ('Yes', 'No', 'No internet service')",
+    )
+    OnlineBackup: str = Field(
+        ...,
+        json_schema_extra={"example": "Yes"},
+        description="Whether customer has online backup ('Yes', 'No', 'No internet service')",
+    )
+    DeviceProtection: str = Field(
+        ...,
+        json_schema_extra={"example": "No"},
+        description="Whether customer has device protection ('Yes', 'No', 'No internet service')",
+    )
+    TechSupport: str = Field(
+        ...,
+        json_schema_extra={"example": "No"},
+        description="Whether customer has tech support ('Yes', 'No', 'No internet service')",
+    )
+    StreamingTV: str = Field(
+        ...,
+        json_schema_extra={"example": "No"},
+        description="Whether customer has streaming TV ('Yes', 'No', 'No internet service')",
+    )
+    StreamingMovies: str = Field(
+        ...,
+        json_schema_extra={"example": "No"},
+        description="Whether customer has streaming movies ('Yes', 'No', 'No internet service')",
+    )
+    Contract: str = Field(
+        ...,
+        json_schema_extra={"example": "Month-to-month"},
+        description="Contract term ('Month-to-month', 'One year', 'Two year')",
+    )
+    PaperlessBilling: str = Field(
+        ..., json_schema_extra={"example": "Yes"}, description="Whether customer has paperless billing ('Yes', 'No')"
+    )
+    PaymentMethod: str = Field(
+        ...,
+        json_schema_extra={"example": "Electronic check"},
+        description="Payment method ('Electronic check', 'Mailed check', 'Bank transfer (automatic)', 'Credit card (automatic)')",
+    )
+    MonthlyCharges: float = Field(
+        ..., ge=0.0, le=300.0, json_schema_extra={"example": 65.50}, description="Monthly charge amount"
+    )
+    TotalCharges: float = Field(
+        ..., ge=0.0, json_schema_extra={"example": 786.00}, description="Total amount charged to customer"
+    )
 
-    @field_validator('gender')
+    @field_validator("gender")
     @classmethod
     def validate_gender(cls, v):
-        if v not in ['Male', 'Female']:
-            raise ValueError('gender must be either Male or Female')
+        if v not in ["Male", "Female"]:
+            raise ValueError("gender must be either Male or Female")
         return v
 
-    @field_validator('Partner', 'Dependents', 'PhoneService', 'PaperlessBilling')
+    @field_validator("Partner", "Dependents", "PhoneService", "PaperlessBilling")
     @classmethod
     def validate_yes_no(cls, v):
-        if v not in ['Yes', 'No']:
-            raise ValueError('This field must be either Yes or No')
+        if v not in ["Yes", "No"]:
+            raise ValueError("This field must be either Yes or No")
         return v
 
-    @field_validator('MultipleLines')
+    @field_validator("MultipleLines")
     @classmethod
     def validate_multiple_lines(cls, v):
-        if v not in ['Yes', 'No', 'No phone service']:
-            raise ValueError('MultipleLines must be Yes, No, or No phone service')
+        if v not in ["Yes", "No", "No phone service"]:
+            raise ValueError("MultipleLines must be Yes, No, or No phone service")
         return v
 
-    @field_validator('InternetService')
+    @field_validator("InternetService")
     @classmethod
     def validate_internet_service(cls, v):
-        if v not in ['DSL', 'Fiber optic', 'No']:
-            raise ValueError('InternetService must be DSL, Fiber optic, or No')
+        if v not in ["DSL", "Fiber optic", "No"]:
+            raise ValueError("InternetService must be DSL, Fiber optic, or No")
         return v
 
-    @field_validator('OnlineSecurity', 'OnlineBackup', 'DeviceProtection', 'TechSupport', 'StreamingTV', 'StreamingMovies')
+    @field_validator(
+        "OnlineSecurity", "OnlineBackup", "DeviceProtection", "TechSupport", "StreamingTV", "StreamingMovies"
+    )
     @classmethod
     def validate_service_options(cls, v):
-        if v not in ['Yes', 'No', 'No internet service']:
-            raise ValueError('This field must be Yes, No, or No internet service')
+        if v not in ["Yes", "No", "No internet service"]:
+            raise ValueError("This field must be Yes, No, or No internet service")
         return v
 
-    @field_validator('Contract')
+    @field_validator("Contract")
     @classmethod
     def validate_contract(cls, v):
-        if v not in ['Month-to-month', 'One year', 'Two year']:
-            raise ValueError('Contract must be Month-to-month, One year, or Two year')
+        if v not in ["Month-to-month", "One year", "Two year"]:
+            raise ValueError("Contract must be Month-to-month, One year, or Two year")
         return v
 
-    @field_validator('PaymentMethod')
+    @field_validator("PaymentMethod")
     @classmethod
     def validate_payment_method(cls, v):
-        if v not in ['Electronic check', 'Mailed check', 'Bank transfer (automatic)', 'Credit card (automatic)']:
-            raise ValueError('PaymentMethod must be one of the valid payment methods')
+        if v not in ["Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"]:
+            raise ValueError("PaymentMethod must be one of the valid payment methods")
         return v
 
 
@@ -88,7 +151,9 @@ class ChurnOutput(BaseModel):
 
 
 class BatchChurnInput(BaseModel):
-    customers: list[ChurnInput] = Field(..., min_length=1, max_length=100, description="List of customer records to predict")
+    customers: list[ChurnInput] = Field(
+        ..., min_length=1, max_length=100, description="List of customer records to predict"
+    )
 
 
 class BatchChurnResult(BaseModel):

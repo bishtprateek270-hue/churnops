@@ -8,8 +8,6 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.config import settings
-
 import matplotlib
 
 matplotlib.use("Agg")
@@ -37,8 +35,12 @@ from sklearn.metrics import (
     roc_curve,
 )
 
+from src.config import settings
 
-def calculate_classification_metrics(y_true: np.ndarray, y_pred: np.ndarray, y_prob: np.ndarray | None = None) -> dict[str, float]:
+
+def calculate_classification_metrics(
+    y_true: np.ndarray, y_pred: np.ndarray, y_prob: np.ndarray | None = None
+) -> dict[str, float]:
     """Compute comprehensive classification performance metrics."""
     acc = float(accuracy_score(y_true, y_pred))
     prec = float(precision_score(y_true, y_pred, zero_division=0))
@@ -91,10 +93,7 @@ def calculate_regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict
 
 
 def calculate_all_metrics(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    y_prob: np.ndarray | None = None,
-    task_type: str = "classification"
+    y_true: np.ndarray, y_pred: np.ndarray, y_prob: np.ndarray | None = None, task_type: str = "classification"
 ) -> dict[str, float]:
     """Wrapper function to compute all relevant metrics based on task type."""
     if task_type == "classification":
@@ -108,7 +107,7 @@ def optimize_business_threshold(
     y_prob: np.ndarray,
     cost_fn: float = settings.COST_FN,
     cost_fp: float = settings.COST_FP,
-    num_thresholds: int = 100
+    num_thresholds: int = 100,
 ) -> tuple[float, float, dict]:
     """Optimize probability decision threshold to maximize F1 score while minimizing business cost.
 
@@ -156,7 +155,7 @@ def log_classification_plots(
     y_pred: np.ndarray,
     y_prob: np.ndarray | None = None,
     model_name: str = "Best_Model",
-    output_dir: str = settings.REPORTS_PLOTS_DIR
+    output_dir: str = settings.REPORTS_PLOTS_DIR,
 ) -> dict[str, str]:
     """Generate and save Confusion Matrix, ROC Curve, and PR Curve plots to disk."""
     os.makedirs(output_dir, exist_ok=True)
@@ -173,9 +172,15 @@ def log_classification_plots(
     # 1. Confusion Matrix Plot
     cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
     plt.figure(figsize=(6, 5))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False,
-                xticklabels=["Negative (0)", "Positive (1)"],
-                yticklabels=["Negative (0)", "Positive (1)"])
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        cbar=False,
+        xticklabels=["Negative (0)", "Positive (1)"],
+        yticklabels=["Negative (0)", "Positive (1)"],
+    )
     plt.xlabel("Predicted Label")
     plt.ylabel("True Label")
     plt.title(f"Confusion Matrix - {model_name}")
@@ -227,10 +232,7 @@ def log_classification_plots(
 
 
 def plot_calibration_curve_to_file(
-    y_true: np.ndarray,
-    y_prob: np.ndarray,
-    model_name: str,
-    output_path: str = "reports/plots/calibration_curve.png"
+    y_true: np.ndarray, y_prob: np.ndarray, model_name: str, output_path: str = "reports/plots/calibration_curve.png"
 ) -> str:
     """Generate and save probability calibration curve."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -250,10 +252,7 @@ def plot_calibration_curve_to_file(
 
 
 def generate_shap_plots(
-    model: object,
-    X_sample: np.ndarray,
-    feature_names: list[str],
-    output_dir: str = "reports/plots"
+    model: object, X_sample: np.ndarray, feature_names: list[str], output_dir: str = "reports/plots"
 ) -> tuple[dict[str, str], str | None]:
     """Generate SHAP summary plot and feature importance chart."""
     os.makedirs(output_dir, exist_ok=True)
@@ -296,7 +295,7 @@ def perform_error_analysis(
     y_pred: np.ndarray,
     y_prob: np.ndarray | None = None,
     X_df: pd.DataFrame | None = None,
-    task_type: str = "classification"
+    task_type: str = "classification",
 ) -> dict:
     """Analyze classification False Positives/False Negatives or regression Residual Errors."""
     if task_type == "regression":
@@ -322,14 +321,18 @@ def perform_error_analysis(
     return analysis
 
 
-def _get_model_version_metrics(client: mlflow.tracking.MlflowClient, model_name: str, version: str) -> tuple[dict[str, float], float]:
+def _get_model_version_metrics(
+    client: mlflow.tracking.MlflowClient, model_name: str, version: str
+) -> tuple[dict[str, float], float]:
     """Retrieve run metrics associated with a registered model version."""
     try:
         mv = client.get_model_version(model_name, version)
         if mv.run_id:
             run = client.get_run(mv.run_id)
             metrics = {k: float(v) for k, v in run.data.metrics.items()}
-            f1 = metrics.get("val_f1_score", metrics.get("f1_score", metrics.get("val_roc_auc", metrics.get("roc_auc", 0.0))))
+            f1 = metrics.get(
+                "val_f1_score", metrics.get("f1_score", metrics.get("val_roc_auc", metrics.get("roc_auc", 0.0)))
+            )
             return metrics, float(f1)
     except Exception as exc:
         print(f"Notice: Could not fetch metrics for model version {version}: {exc}")
@@ -357,6 +360,7 @@ def compare_and_promote(promote: bool = True) -> tuple[bool, dict]:
     if cand_f1 == 0.0 and os.path.exists("models/unified_pipeline.joblib"):
         try:
             import joblib
+
             unified = joblib.load("models/unified_pipeline.joblib")
             holdout = unified.get("holdout_metrics", {})
             cand_f1 = float(holdout.get("f1_score", holdout.get("r2_score", 0.80)))
@@ -375,10 +379,7 @@ def compare_and_promote(promote: bool = True) -> tuple[bool, dict]:
 
     if promote and should_promote:
         client.transition_model_version_stage(
-            name=model_name,
-            version=candidate_version,
-            stage="Production",
-            archive_existing_versions=True
+            name=model_name, version=candidate_version, stage="Production", archive_existing_versions=True
         )
         promoted = True
 
@@ -390,4 +391,3 @@ def compare_and_promote(promote: bool = True) -> tuple[bool, dict]:
         "production_metrics": prod_metrics or ({"f1_score": prod_f1} if prod_version else None),
     }
     return promoted, report
-

@@ -25,12 +25,15 @@ class TestConfigSettings(unittest.TestCase):
 
     def test_environment_override(self):
         """Test overriding settings via environment variables."""
-        with patch.dict(os.environ, {
-            "MLFLOW_EXPERIMENT_NAME": "Custom_Experiment",
-            "MODEL_NAME": "Custom-Model-Name",
-            "COST_FN": "750.0",
-            "FAST_MODE_TRIALS": "10",
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "MLFLOW_EXPERIMENT_NAME": "Custom_Experiment",
+                "MODEL_NAME": "Custom-Model-Name",
+                "COST_FN": "750.0",
+                "FAST_MODE_TRIALS": "10",
+            },
+        ):
             custom_settings = Settings()
             self.assertEqual(custom_settings.MLFLOW_EXPERIMENT_NAME, "Custom_Experiment")
             self.assertEqual(custom_settings.MODEL_NAME, "Custom-Model-Name")

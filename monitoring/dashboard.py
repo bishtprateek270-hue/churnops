@@ -36,9 +36,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("📊 Monitoring")
-    st.markdown(
-        "Track prediction volume, churn rate, PSI drift alerts, and recent API requests."
-    )
+    st.markdown("Track prediction volume, churn rate, PSI drift alerts, and recent API requests.")
 
 with col2:
     st.subheader("🎯 Train & Predict")

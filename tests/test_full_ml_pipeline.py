@@ -40,14 +40,16 @@ def test_churn_feature_engineer(sample_churn_df):
     transformer = GenericFeatureEngineer()
     engineered_df = transformer.transform(sample_churn_df)
 
-    assert "tenure_per_MonthlyCharges" in engineered_df.columns or len(engineered_df.columns) > len(sample_churn_df.columns)
+    assert "tenure_per_MonthlyCharges" in engineered_df.columns or len(engineered_df.columns) > len(
+        sample_churn_df.columns
+    )
     assert len(engineered_df) == len(sample_churn_df)
 
 
 def test_business_threshold_optimization():
     """Test probability decision threshold optimization based on business cost."""
     np.random.seed(42)
-    y_true = np.array([0]*80 + [1]*20)
+    y_true = np.array([0] * 80 + [1] * 20)
     y_prob = np.random.uniform(0, 1, size=100)
 
     best_th, min_cost, cost_metrics = optimize_business_threshold(
@@ -81,7 +83,13 @@ def test_full_pipeline_train_evaluate_and_save(sample_churn_df, tmp_path):
 
     train_res = train_and_evaluate(data_path=str(csv_path), target_col="Churn", fast_mode=True)
 
-    assert train_res["best_model_name"] in ["Logistic_Regression", "Random_Forest", "HistGradientBoosting", "XGBoost", "CatBoost"]
+    assert train_res["best_model_name"] in [
+        "Logistic_Regression",
+        "Random_Forest",
+        "HistGradientBoosting",
+        "XGBoost",
+        "CatBoost",
+    ]
     assert "optimal_threshold" in train_res
 
     # Check exported artifacts

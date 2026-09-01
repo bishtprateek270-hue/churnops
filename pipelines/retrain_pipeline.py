@@ -41,7 +41,9 @@ def run_retraining_pipeline():
     # 2. Train and register candidate model in Staging
     print("\n--- Training Candidate Models ---")
     train_result = train_and_evaluate(data_path=data_path)
-    print(f"Training completed. Best Staging Version: {train_result['version']} (Val F1: {train_result['best_f1']:.4f})")
+    print(
+        f"Training completed. Best Staging Version: {train_result['version']} (Val F1: {train_result['best_f1']:.4f})"
+    )
 
     # 3. Evaluate against current Production model and promote if superior
     print("\n--- Evaluating Candidate Model against Production ---")

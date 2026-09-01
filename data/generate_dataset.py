@@ -11,7 +11,10 @@ import pandas as pd
 def generate_telco_churn_data(num_samples: int = 7043, seed: int = 42) -> pd.DataFrame:
     np.random.seed(seed)
 
-    customer_ids = [f"{np.random.randint(1000, 9999)}-{chr(65 + i % 26)}{chr(65 + (i * 3) % 26)}{chr(65 + (i * 7) % 26)}" for i in range(num_samples)]
+    customer_ids = [
+        f"{np.random.randint(1000, 9999)}-{chr(65 + i % 26)}{chr(65 + (i * 3) % 26)}{chr(65 + (i * 7) % 26)}"
+        for i in range(num_samples)
+    ]
 
     genders = np.random.choice(["Male", "Female"], size=num_samples)
     senior_citizens = np.random.choice([0, 1], size=num_samples, p=[0.84, 0.16])
@@ -49,9 +52,11 @@ def generate_telco_churn_data(num_samples: int = 7043, seed: int = 42) -> pd.Dat
 
     contracts = np.random.choice(["Month-to-month", "One year", "Two year"], size=num_samples, p=[0.55, 0.21, 0.24])
     paperless_billing = np.random.choice(["Yes", "No"], size=num_samples, p=[0.59, 0.41])
-    payment_methods = np.random.choice([
-        "Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"
-    ], size=num_samples, p=[0.34, 0.23, 0.22, 0.21])
+    payment_methods = np.random.choice(
+        ["Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"],
+        size=num_samples,
+        p=[0.34, 0.23, 0.22, 0.21],
+    )
 
     # Monthly charges depend realistic on features
     base_charge = 20.0
@@ -86,29 +91,31 @@ def generate_telco_churn_data(num_samples: int = 7043, seed: int = 42) -> pd.Dat
     churn_prob = 1 / (1 + np.exp(-churn_score))
     churn = np.where(churn_prob > 0.62, "Yes", "No")
 
-    df = pd.DataFrame({
-        "customerID": customer_ids,
-        "gender": genders,
-        "SeniorCitizen": senior_citizens,
-        "Partner": partners,
-        "Dependents": dependents,
-        "tenure": tenure,
-        "PhoneService": phone_service,
-        "MultipleLines": multiple_lines,
-        "InternetService": internet_service,
-        "OnlineSecurity": online_security,
-        "OnlineBackup": online_backup,
-        "DeviceProtection": device_protection,
-        "TechSupport": tech_support,
-        "StreamingTV": streaming_tv,
-        "StreamingMovies": streaming_movies,
-        "Contract": contracts,
-        "PaperlessBilling": paperless_billing,
-        "PaymentMethod": payment_methods,
-        "MonthlyCharges": monthly_charges,
-        "TotalCharges": total_charges,
-        "Churn": churn
-    })
+    df = pd.DataFrame(
+        {
+            "customerID": customer_ids,
+            "gender": genders,
+            "SeniorCitizen": senior_citizens,
+            "Partner": partners,
+            "Dependents": dependents,
+            "tenure": tenure,
+            "PhoneService": phone_service,
+            "MultipleLines": multiple_lines,
+            "InternetService": internet_service,
+            "OnlineSecurity": online_security,
+            "OnlineBackup": online_backup,
+            "DeviceProtection": device_protection,
+            "TechSupport": tech_support,
+            "StreamingTV": streaming_tv,
+            "StreamingMovies": streaming_movies,
+            "Contract": contracts,
+            "PaperlessBilling": paperless_billing,
+            "PaymentMethod": payment_methods,
+            "MonthlyCharges": monthly_charges,
+            "TotalCharges": total_charges,
+            "Churn": churn,
+        }
+    )
 
     return df
 
@@ -133,16 +140,18 @@ def generate_kaggle_house_prices_data(num_samples: int = 1460, seed: int = 42) -
         + np.random.normal(0, 15000, size=num_samples)
     ).round(2)
 
-    df = pd.DataFrame({
-        "Id": ids,
-        "OverallQual": overall_qual,
-        "GrLivArea": gr_liv_area,
-        "TotalBsmtSF": total_bsmt_sf,
-        "GarageCars": garage_cars,
-        "YearBuilt": year_built,
-        "Neighborhood": neighborhood,
-        "SalePrice": np.clip(sale_price, 30000.0, None)
-    })
+    df = pd.DataFrame(
+        {
+            "Id": ids,
+            "OverallQual": overall_qual,
+            "GrLivArea": gr_liv_area,
+            "TotalBsmtSF": total_bsmt_sf,
+            "GarageCars": garage_cars,
+            "YearBuilt": year_built,
+            "Neighborhood": neighborhood,
+            "SalePrice": np.clip(sale_price, 30000.0, None),
+        }
+    )
     return df
 
 

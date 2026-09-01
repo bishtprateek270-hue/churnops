@@ -67,7 +67,7 @@ def test_predict_endpoint_success():
         "PaperlessBilling": "Yes",
         "PaymentMethod": "Electronic check",
         "MonthlyCharges": 65.50,
-        "TotalCharges": 786.00
+        "TotalCharges": 786.00,
     }
 
     response = client.post("/predict", json=payload)
@@ -102,7 +102,7 @@ def test_predict_endpoint_malformed_input():
         "PaperlessBilling": "Yes",
         "PaymentMethod": "Electronic check",
         "MonthlyCharges": 65.50,
-        "TotalCharges": 786.00
+        "TotalCharges": 786.00,
     }
 
     response = client.post("/predict", json=payload)
