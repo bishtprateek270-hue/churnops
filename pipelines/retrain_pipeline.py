@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import pandas as pd
 
 from data.generate_dataset import generate_telco_churn_data
+from src.config import settings
 from src.data_validation import validate_data
 from src.evaluate import compare_and_promote
 from src.train import train_and_evaluate
@@ -22,11 +23,12 @@ def run_retraining_pipeline():
     print("=== Starting ChurnOps Automated Retraining Pipeline ===")
 
     # 1. Fetch / Generate Data
-    data_path = "data/raw/telco_churn.csv"
+    data_path = settings.DEFAULT_DATA_PATH
     if not os.path.exists(data_path):
         print(f"Dataset not found at {data_path}. Generating dataset...")
         df = generate_telco_churn_data()
-        os.makedirs("data/raw", exist_ok=True)
+        if "/" in data_path or "\\" in data_path:
+            os.makedirs(os.path.dirname(data_path), exist_ok=True)
         df.to_csv(data_path, index=False)
     else:
         df = pd.read_csv(data_path)

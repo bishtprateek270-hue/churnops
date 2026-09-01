@@ -8,6 +8,8 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from src.config import settings
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -104,8 +106,8 @@ def calculate_all_metrics(
 def optimize_business_threshold(
     y_true: np.ndarray,
     y_prob: np.ndarray,
-    cost_fn: float = 500.0,
-    cost_fp: float = 50.0,
+    cost_fn: float = settings.COST_FN,
+    cost_fp: float = settings.COST_FP,
     num_thresholds: int = 100
 ) -> tuple[float, float, dict]:
     """Optimize probability decision threshold to maximize F1 score while minimizing business cost.
@@ -154,7 +156,7 @@ def log_classification_plots(
     y_pred: np.ndarray,
     y_prob: np.ndarray | None = None,
     model_name: str = "Best_Model",
-    output_dir: str = "reports/plots"
+    output_dir: str = settings.REPORTS_PLOTS_DIR
 ) -> dict[str, str]:
     """Generate and save Confusion Matrix, ROC Curve, and PR Curve plots to disk."""
     os.makedirs(output_dir, exist_ok=True)

@@ -27,6 +27,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
 
 from api.schemas import BatchChurnInput, BatchChurnOutput, ChurnInput, ChurnOutput, HealthResponse
+from src.config import settings
 from src.data_validation import DataValidationError, validate_data
 from src.preprocessing import load_preprocessor, prepare_data
 
@@ -38,13 +39,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns")
-MODEL_NAME = "ChurnOps-Model"
-DB_PATH = os.getenv("PREDICTIONS_DB_PATH", "monitoring/predictions.db")
-API_KEY_HEADER = os.getenv("API_KEY_HEADER", "X-API-Key")
-RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "100"))
-ENABLE_CORS = os.getenv("ENABLE_CORS", "true").lower() == "true"
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
+MLFLOW_URI = settings.MLFLOW_TRACKING_URI
+MODEL_NAME = settings.MODEL_NAME
+DB_PATH = settings.PREDICTIONS_DB_PATH
+API_KEY_HEADER = settings.API_KEY_HEADER
+RATE_LIMIT_PER_MINUTE = settings.RATE_LIMIT_PER_MINUTE
+ENABLE_CORS = settings.ENABLE_CORS
+CORS_ORIGINS = settings.CORS_ORIGINS
 
 # Global state loaded during lifespan
 model_store = {
@@ -162,7 +163,7 @@ def load_model_and_preprocessor():
 
     # 1. Load preprocessor
     try:
-        model_store["preprocessor"] = load_preprocessor("models/preprocessor.joblib")
+        model_store["preprocessor"] = load_preprocessor(settings.PREPROCESSOR_PATH)
         logger.info("Successfully loaded preprocessor artifact.")
     except Exception as e:
         logger.warning(f"Could not load preprocessor from disk: {e}")
@@ -188,7 +189,7 @@ def load_model_and_preprocessor():
             logger.warning(f"Could not load model from MLflow stage '{stage}': {e}")
 
     # Fallback to local joblib file
-    fallback_path = "models/best_model.joblib"
+    fallback_path = settings.BEST_MODEL_PATH
     if os.path.exists(fallback_path):
         logger.info(f"Loading fallback model from local file {fallback_path}...")
         model_store["model"] = joblib.load(fallback_path)

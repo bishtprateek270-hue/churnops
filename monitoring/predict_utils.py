@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 import __main__
+from src.config import settings
 from src.data_validation import DataValidationError, validate_data
 from src.preprocessing import GenericFeatureEngineer, find_target_col, load_preprocessor, prepare_data
 from src.train import train_and_evaluate
@@ -20,10 +21,10 @@ from src.train import train_and_evaluate
 __main__.GenericFeatureEngineer = GenericFeatureEngineer
 __main__.ChurnFeatureEngineer = GenericFeatureEngineer
 
-MODEL_PATH = "models/best_model.joblib"
-PREPROCESSOR_PATH = "models/preprocessor.joblib"
-UNIFIED_PIPELINE_PATH = "models/unified_pipeline.joblib"
-UPLOAD_PATH = "data/raw/user_upload.csv"
+MODEL_PATH = settings.BEST_MODEL_PATH
+PREPROCESSOR_PATH = settings.PREPROCESSOR_PATH
+UNIFIED_PIPELINE_PATH = settings.UNIFIED_PIPELINE_PATH
+UPLOAD_PATH = settings.UPLOAD_DATA_PATH
 
 
 def save_uploaded_dataset(df: pd.DataFrame, path: str = UPLOAD_PATH) -> str:

@@ -15,8 +15,10 @@ import numpy as np
 import pandas as pd
 from scipy.stats import ks_2samp
 
-DB_PATH = os.getenv("PREDICTIONS_DB_PATH", "monitoring/predictions.db")
-TRAIN_DATA_PATH = "data/raw/telco_churn.csv"
+from src.config import settings
+
+DB_PATH = settings.PREDICTIONS_DB_PATH
+TRAIN_DATA_PATH = settings.DEFAULT_DATA_PATH
 
 
 def calculate_psi_numerical(expected: np.ndarray, actual: np.ndarray, num_bins: int = 10) -> float:

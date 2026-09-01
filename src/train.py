@@ -34,6 +34,7 @@ from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier, XGBRegressor
 
+from src.config import settings
 from src.data_validation import DataValidationError, validate_data
 from src.eda_inspector import detect_data_leakage, generate_eda_report, inspect_dataset
 from src.evaluate import (
@@ -54,9 +55,9 @@ from src.preprocessing import (
 )
 
 # MLflow Configuration
-MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "file:./mlruns")
-EXPERIMENT_NAME = "ChurnOps_Churn_Prediction"
-MODEL_NAME = "ChurnOps-Model"
+MLFLOW_URI = settings.MLFLOW_TRACKING_URI
+EXPERIMENT_NAME = settings.MLFLOW_EXPERIMENT_NAME
+MODEL_NAME = settings.MODEL_NAME
 
 
 def setup_mlflow():
@@ -172,10 +173,10 @@ def run_optuna_tuning(
 
 
 def train_and_evaluate(
-    data_path: str = "data/raw/telco_churn.csv",
+    data_path: str = settings.DEFAULT_DATA_PATH,
     target_col: str | None = None,
     fast_mode: bool = True,
-    n_optuna_trials: int = 5,
+    n_optuna_trials: int = settings.FAST_MODE_TRIALS,
     allow_id_target: bool = False,
     progress_callback: object | None = None,
 ) -> dict:
@@ -199,9 +200,9 @@ def train_and_evaluate(
         print(f"Loading raw dataset from {data_path}...")
         df = pd.read_csv(data_path)
 
-    os.makedirs("reports/plots", exist_ok=True)
+    os.makedirs(settings.REPORTS_PLOTS_DIR, exist_ok=True)
     for p_name in ["confusion_matrix.png", "roc_curve.png", "pr_curve.png", "calibration_curve.png", "shap_summary.png"]:
-        p_file = os.path.join("reports/plots", p_name)
+        p_file = os.path.join(settings.REPORTS_PLOTS_DIR, p_name)
         if os.path.exists(p_file):
             try:
                 os.remove(p_file)
@@ -542,10 +543,10 @@ def train_and_evaluate(
         "warnings": warnings_list,
     }
 
-    os.makedirs("models", exist_ok=True)
-    joblib.dump(best_model_obj, "models/best_model.joblib")
-    joblib.dump(full_pipeline, "models/unified_pipeline.joblib")
-    print("Saved unified pipeline artifact to models/unified_pipeline.joblib")
+    os.makedirs(settings.MODELS_DIR, exist_ok=True)
+    joblib.dump(best_model_obj, settings.BEST_MODEL_PATH)
+    joblib.dump(full_pipeline, settings.UNIFIED_PIPELINE_PATH)
+    print(f"Saved unified pipeline artifact to {settings.UNIFIED_PIPELINE_PATH}")
 
     t_total = time.perf_counter() - t_start
     print(f"[SUCCESS] TOTAL PIPELINE RUNTIME: {t_total:.2f}s")
