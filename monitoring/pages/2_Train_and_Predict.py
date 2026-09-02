@@ -2,6 +2,7 @@ import importlib
 import io
 import os
 import sys
+from typing import Any
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
@@ -168,8 +169,8 @@ with tab_samples:
             try:
                 from sklearn.datasets import fetch_california_housing
 
-                housing = fetch_california_housing(as_frame=True)
-                loaded_df = housing.frame.head(1000)
+                housing_bunch: Any = fetch_california_housing(as_frame=True)
+                loaded_df = housing_bunch.frame.head(1000)
                 st.session_state.uploaded_df = loaded_df
                 save_uploaded_dataset(loaded_df)
                 st.success(
@@ -182,8 +183,8 @@ with tab_samples:
             try:
                 from sklearn.datasets import load_iris
 
-                iris = load_iris(as_frame=True)
-                loaded_df = iris.frame
+                iris_bunch: Any = load_iris(as_frame=True)
+                loaded_df = iris_bunch.frame
                 st.session_state.uploaded_df = loaded_df
                 save_uploaded_dataset(loaded_df)
                 st.success(
@@ -489,7 +490,7 @@ with predict_tab_form:
     feature_cols = getattr(preprocessor, "feature_cols_", [])
 
     with st.form("manual_predict_form"):
-        form_inputs = {}
+        form_inputs: dict[str, Any] = {}
         cols = st.columns(3)
 
         for col_idx, col_name in enumerate(feature_cols):
