@@ -795,27 +795,27 @@ def root():
     <header class="header">
         <div class="header-content">
             <div class="brand">
-                <div class="brand-icon">⚡</div>
+                <div class="brand-icon">&#9889;</div>
                 <div class="brand-text">
                     <h1>ChurnOps</h1>
                     <p>Machine Learning Studio & Monitoring System</p>
                 </div>
             </div>
             <div class="nav-actions">
-                <a href="/docs" target="_blank" class="btn-link">📘 API Docs</a>
-                <a href="/health" target="_blank" class="btn-link">💓 Health Probe</a>
-                <a href="https://github.com/bishtprateek270-hue/churnops" target="_blank" class="btn-link">🐙 GitHub</a>
+                <a href="/docs" target="_blank" class="btn-link">&#128216; API Docs</a>
+                <a href="/health" target="_blank" class="btn-link">&#128147; Health Probe</a>
+                <a href="https://github.com/bishtprateek270-hue/churnops" target="_blank" class="btn-link">&#128191; GitHub</a>
             </div>
         </div>
     </header>
 
     <main class="main-container">
         <nav class="tabs-nav">
-            <button class="tab-btn active" onclick="switchTab('tab-upload')">📁 1. Dataset Upload & Train</button>
-            <button class="tab-btn" onclick="switchTab('tab-row')">🎯 2. Predict Dataset Row</button>
-            <button class="tab-btn" onclick="switchTab('tab-batch')">⚡ 3. Batch CSV Inference</button>
-            <button class="tab-btn" onclick="switchTab('tab-custom')">📝 4. Custom Single Form</button>
-            <button class="tab-btn" onclick="switchTab('tab-health')">📊 5. Service Telemetry</button>
+            <button class="tab-btn active" onclick="switchTab('tab-upload', event)">&#128194; 1. Dataset Upload & Train</button>
+            <button class="tab-btn" onclick="switchTab('tab-row', event)">&#127919; 2. Predict Dataset Row</button>
+            <button class="tab-btn" onclick="switchTab('tab-batch', event)">&#9889; 3. Batch CSV Inference</button>
+            <button class="tab-btn" onclick="switchTab('tab-custom', event)">&#128221; 4. Custom Single Form</button>
+            <button class="tab-btn" onclick="switchTab('tab-health', event)">&#128202; 5. Service Telemetry</button>
         </nav>
 
         <!-- TAB 1: UPLOAD & TRAIN -->
@@ -828,7 +828,7 @@ def root():
 
                 <div class="dropzone" id="dropzoneBox" onclick="document.getElementById('csvInput').click()">
                     <input type="file" id="csvInput" accept=".csv" onchange="handleFileInputChange(event)">
-                    <div class="dropzone-icon">📄</div>
+                    <div class="dropzone-icon">&#128196;</div>
                     <div class="dropzone-text" id="dropText">Click to select or drag and drop CSV file</div>
                     <div class="dropzone-sub">Supports tabular classification or regression datasets</div>
                 </div>
@@ -852,7 +852,7 @@ def root():
                     </div>
 
                     <div style="margin-bottom: 1.25rem;">
-                        <button class="btn-primary" onclick="trainModel()"><span id="trainSpinner">🚀</span> Train Leak-Free Model Suite</button>
+                        <button class="btn-primary" onclick="trainModel()"><span id="trainSpinner">&#9889;</span> Train Leak-Free Model Suite</button>
                     </div>
 
                     <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">Dataset Preview (First 10 Rows)</h3>
@@ -887,7 +887,7 @@ def root():
                 </div>
 
                 <div style="margin-bottom: 1rem;">
-                    <button class="btn-primary" onclick="predictRow()"><span id="predictRowSpinner">⚡</span> Predict Selected Row</button>
+                    <button class="btn-primary" onclick="predictRow()"><span id="predictRowSpinner">&#9889;</span> Predict Selected Row</button>
                 </div>
 
                 <div id="rowOutputContainer" style="display: none;">
@@ -914,12 +914,12 @@ def root():
                     </div>
                 </div>
 
-                <button class="btn-primary" onclick="runBatchPrediction()">⚡ Run Batch Prediction</button>
+                <button class="btn-primary" onclick="runBatchPrediction()">&#9889; Run Batch Prediction</button>
 
                 <div id="batchResultsContainer" style="display: none; margin-top: 1.25rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                         <h3 style="font-size: 0.95rem; font-weight: 700;">Batch Predictions Output</h3>
-                        <button class="btn-link" onclick="downloadBatchCSV()">📥 Download CSV</button>
+                        <button class="btn-link" onclick="downloadBatchCSV()">&#128229; Download CSV</button>
                     </div>
                     <div class="data-table-container">
                         <table id="batchTable"></table>
@@ -937,8 +937,8 @@ def root():
                 </div>
 
                 <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem;">
-                    <button class="btn-link" onclick="fillPreset('high')">⚠️ High Risk Customer Preset</button>
-                    <button class="btn-link" onclick="fillPreset('low')">✅ Low Risk Customer Preset</button>
+                    <button class="btn-link" onclick="fillPreset('high')">&#9888; High Risk Customer Preset</button>
+                    <button class="btn-link" onclick="fillPreset('low')">&#9989; Low Risk Customer Preset</button>
                 </div>
 
                 <form id="customForm" onsubmit="submitCustomForm(event)">
@@ -982,7 +982,7 @@ def root():
                         </div>
                     </div>
 
-                    <button type="submit" class="btn-primary">⚡ Run Live Prediction</button>
+                    <button type="submit" class="btn-primary">&#9889; Run Live Prediction</button>
                 </form>
 
                 <div id="customResult" style="display: none; margin-top: 1.25rem;">
@@ -1012,12 +1012,17 @@ def root():
         let activeDataset = null;
         let batchResultsData = null;
 
-        function switchTab(tabId) {
+        function switchTab(tabId, evt) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-            event.currentTarget.classList.add('active');
-            document.getElementById(tabId).classList.add('active');
+            if (evt && evt.currentTarget) {
+                evt.currentTarget.classList.add('active');
+            }
+            const targetEl = document.getElementById(tabId);
+            if (targetEl) {
+                targetEl.classList.add('active');
+            }
 
             if (tabId === 'tab-row' && activeDataset) {
                 loadRowPreview();
@@ -1044,25 +1049,25 @@ def root():
             if (!dropzone) return;
 
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropzone.addEventListener(eventName, (e) => {
+                dropzone.addEventListener(eventName, function(e) {
                     e.preventDefault();
                     e.stopPropagation();
                 }, false);
-                document.body.addEventListener(eventName, (e) => {
+                document.body.addEventListener(eventName, function(e) {
                     e.preventDefault();
                     e.stopPropagation();
                 }, false);
             });
 
             ['dragenter', 'dragover'].forEach(eventName => {
-                dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'), false);
+                dropzone.addEventListener(eventName, function() { dropzone.classList.add('dragover'); }, false);
             });
 
             ['dragleave', 'drop'].forEach(eventName => {
-                dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'), false);
+                dropzone.addEventListener(eventName, function() { dropzone.classList.remove('dragover'); }, false);
             });
 
-            dropzone.addEventListener('drop', (e) => {
+            dropzone.addEventListener('drop', function(e) {
                 const dt = e.dataTransfer;
                 const files = dt.files;
                 if (files && files.length > 0) {
@@ -1080,15 +1085,15 @@ def root():
         async function uploadFile(file) {
             if (!file) return;
             if (!file.name.toLowerCase().endsWith('.csv')) {
-                document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-warning">⚠️ Please select or drop a valid .csv file.</div>';
+                document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-warning">&#9888; Please select or drop a valid .csv file.</div>';
                 return;
             }
 
-            document.getElementById('dropText').innerText = `Selected: ${file.name}`;
+            document.getElementById('dropText').innerText = 'Selected: ' + file.name;
             const formData = new FormData();
             formData.append('file', file);
 
-            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">Uploading and validating CSV...</div>';
+            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">&#8987; Uploading and validating CSV...</div>';
 
             try {
                 const res = await fetch('/dataset/upload', { method: 'POST', body: formData });
@@ -1096,13 +1101,13 @@ def root():
 
                 if (res.ok) {
                     activeDataset = data;
-                    document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-success">✅ Loaded ${data.rows} rows, ${data.num_columns} columns. Detected target: '<strong>${data.detected_target}</strong>'</div>`;
+                    document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-success">&#9989; Loaded ' + data.rows + ' rows, ' + data.num_columns + ' columns. Detected target: <strong>' + data.detected_target + '</strong></div>';
                     renderDatasetInfo(data);
                 } else {
-                    document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-danger">❌ ${data.detail || 'Upload failed'}</div>`;
+                    document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; ' + (data.detail || 'Upload failed') + '</div>';
                 }
             } catch (err) {
-                document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-danger">❌ Error uploading file: ${err.message}</div>`;
+                document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Error uploading file: ' + err.message + '</div>';
             }
         }
 
@@ -1130,16 +1135,16 @@ def root():
             table.innerHTML = '';
 
             const cols = Object.keys(records[0]);
-            let thead = '<thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead>';
-            let tbody = '<tbody>' + records.map(r => '<tr>' + cols.map(c => `<td>${r[c] !== null ? r[c] : ''}</td>`).join('') + '</tr>').join('') + '</tbody>';
+            let thead = '<thead><tr>' + cols.map(c => '<th>' + c + '</th>').join('') + '</tr></thead>';
+            let tbody = '<tbody>' + records.map(r => '<tr>' + cols.map(c => '<td>' + (r[c] !== null ? r[c] : '') + '</td>').join('') + '</tr>').join('') + '</tbody>';
 
             table.innerHTML = thead + tbody;
         }
 
         async function trainModel() {
             const target_col = document.getElementById('targetSelect').value;
-            document.getElementById('trainSpinner').innerText = '⏳';
-            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">⏳ Training model suite... Please wait...</div>';
+            document.getElementById('trainSpinner').innerText = '...';
+            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">&#8987; Training model suite... Please wait...</div>';
 
             try {
                 const res = await fetch('/dataset/train', {
@@ -1149,24 +1154,24 @@ def root():
                 });
 
                 const data = await res.json();
-                document.getElementById('trainSpinner').innerText = '🚀';
+                document.getElementById('trainSpinner').innerText = 'Train';
 
                 if (res.ok && data.status === 'success') {
-                    document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-success">🎉 Training complete! Best Model: <strong>${data.result.best_model_name}</strong> in ${data.result.total_time_seconds}s</div>`;
+                    document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-success">&#127881; Training complete! Best Model: <strong>' + data.result.best_model_name + '</strong> in ' + data.result.total_time_seconds + 's</div>';
                     renderResults(data.result);
                 } else {
-                    document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-danger">❌ Training failed: ${data.detail || 'Error'}</div>`;
+                    document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Training failed: ' + (data.detail || 'Error') + '</div>';
                 }
             } catch (err) {
-                document.getElementById('trainSpinner').innerText = '🚀';
-                document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-danger">❌ Error during training: ${err.message}</div>`;
+                document.getElementById('trainSpinner').innerText = 'Train';
+                document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Error during training: ' + err.message + '</div>';
             }
         }
 
         function renderResults(result) {
             const card = document.getElementById('trainingResultsCard');
             card.style.display = 'block';
-            document.getElementById('bestModelTitle').innerText = `Holdout Test Metrics — Best Model: ${result.best_model_name.replace(/_/g, ' ')}`;
+            document.getElementById('bestModelTitle').innerText = 'Holdout Test Metrics — Best Model: ' + result.best_model_name.replace(/_/g, ' ');
 
             const metrics = result.best_test_metrics || {};
             const grid = document.getElementById('metricsGrid');
@@ -1177,7 +1182,7 @@ def root():
                 if (typeof v === 'number') {
                     displayVal = (k.includes('accuracy') || k.includes('precision') || k.includes('recall')) ? (v * 100).toFixed(1) + '%' : v.toFixed(4);
                 }
-                grid.innerHTML += `<div class="metric-tile"><div class="metric-name">${k.replace(/_/g, ' ')}</div><div class="metric-val">${displayVal}</div></div>`;
+                grid.innerHTML += '<div class="metric-tile"><div class="metric-name">' + k.replace(/_/g, ' ') + '</div><div class="metric-val">' + displayVal + '</div></div>';
             }
         }
 
@@ -1200,7 +1205,7 @@ def root():
             const idx = parseInt(document.getElementById('rowIndexInput').value) || 0;
             const rowData = activeDataset.preview[idx % activeDataset.preview.length] || {};
 
-            document.getElementById('predictRowSpinner').innerText = '⏳';
+            document.getElementById('predictRowSpinner').innerText = '...';
 
             try {
                 const res = await fetch('/predict', {
@@ -1210,7 +1215,7 @@ def root():
                 });
 
                 const data = await res.json();
-                document.getElementById('predictRowSpinner').innerText = '⚡';
+                document.getElementById('predictRowSpinner').innerText = 'Predict';
 
                 if (res.ok) {
                     const grid = document.getElementById('rowResultMetrics');
@@ -1224,7 +1229,7 @@ def root():
                     `;
                 }
             } catch(e) {
-                document.getElementById('predictRowSpinner').innerText = '⚡';
+                document.getElementById('predictRowSpinner').innerText = 'Predict';
             }
         }
 
@@ -1318,7 +1323,7 @@ def root():
     </script>
 </body>
 </html>"""
-    return HTMLResponse(content=html_content)
+    return HTMLResponse(content=html_content, media_type="text/html; charset=utf-8")
 
 
 @app.get("/health", response_model=HealthResponse)
