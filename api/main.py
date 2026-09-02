@@ -607,9 +607,10 @@ def root():
             margin-bottom: 1.25rem;
         }
 
-        .dropzone:hover {
+        .dropzone:hover, .dropzone.dragover {
             border-color: var(--primary);
             background: var(--primary-light);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
         }
 
         .dropzone input {
@@ -825,8 +826,8 @@ def root():
                     <p class="card-desc">Upload classification or regression datasets (e.g. Telco Churn, Kaggle House Prices, Credit Churn). Automatic feature validation, ID filtering, and model suite evaluation.</p>
                 </div>
 
-                <div class="dropzone" onclick="document.getElementById('csvInput').click()">
-                    <input type="file" id="csvInput" accept=".csv" onchange="handleFileUpload(event)">
+                <div class="dropzone" id="dropzoneBox" onclick="document.getElementById('csvInput').click()">
+                    <input type="file" id="csvInput" accept=".csv" onchange="handleFileInputChange(event)">
                     <div class="dropzone-icon">📄</div>
                     <div class="dropzone-text" id="dropText">Click to select or drag and drop CSV file</div>
                     <div class="dropzone-sub">Supports tabular classification or regression datasets</div>
@@ -1027,6 +1028,7 @@ def root():
         }
 
         async function initPage() {
+            setupDragAndDrop();
             try {
                 const res = await fetch('/dataset/preview');
                 const data = await res.json();
@@ -1037,9 +1039,50 @@ def root():
             } catch(e) {}
         }
 
-        async function handleFileUpload(e) {
-            const file = e.target.files[0];
+        function setupDragAndDrop() {
+            const dropzone = document.getElementById('dropzoneBox');
+            if (!dropzone) return;
+
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+                document.body.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'), false);
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files && files.length > 0) {
+                    uploadFile(files[0]);
+                }
+            }, false);
+        }
+
+        function handleFileInputChange(e) {
+            if (e.target.files && e.target.files.length > 0) {
+                uploadFile(e.target.files[0]);
+            }
+        }
+
+        async function uploadFile(file) {
             if (!file) return;
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-warning">⚠️ Please select or drop a valid .csv file.</div>';
+                return;
+            }
 
             document.getElementById('dropText').innerText = `Selected: ${file.name}`;
             const formData = new FormData();
@@ -1053,7 +1096,7 @@ def root():
 
                 if (res.ok) {
                     activeDataset = data;
-                    document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-success">✅ Loaded ${data.rows} rows, ${data.num_columns} columns. Detected target: '${data.detected_target}'</div>`;
+                    document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-success">✅ Loaded ${data.rows} rows, ${data.num_columns} columns. Detected target: '<strong>${data.detected_target}</strong>'</div>`;
                     renderDatasetInfo(data);
                 } else {
                     document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-danger">❌ ${data.detail || 'Upload failed'}</div>`;
