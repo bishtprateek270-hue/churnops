@@ -8,6 +8,8 @@ import sys
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from typing import Any
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -18,8 +20,8 @@ from src.data_validation import DataValidationError, validate_data
 from src.preprocessing import GenericFeatureEngineer, find_target_col, load_preprocessor, prepare_data
 from src.train import train_and_evaluate
 
-__main__.GenericFeatureEngineer = GenericFeatureEngineer
-__main__.ChurnFeatureEngineer = GenericFeatureEngineer
+setattr(__main__, "GenericFeatureEngineer", GenericFeatureEngineer)  # noqa: B010
+setattr(__main__, "ChurnFeatureEngineer", GenericFeatureEngineer)  # noqa: B010
 
 MODEL_PATH = settings.BEST_MODEL_PATH
 PREPROCESSOR_PATH = settings.PREPROCESSOR_PATH
@@ -53,7 +55,7 @@ def run_training(
     target_col: str | None = None,
     fast_mode: bool = True,
     allow_id_target: bool = False,
-    progress_callback: object | None = None,
+    progress_callback: Any | None = None,
     **kwargs,
 ) -> dict:
     return train_and_evaluate(
@@ -65,7 +67,7 @@ def run_training(
     )
 
 
-def load_trained_artifacts() -> tuple[object | None, object | None, float, str]:
+def load_trained_artifacts() -> tuple[Any | None, Any | None, float, str]:
     """Safely load unified pipeline artifact with graceful error recovery for outdated or corrupted files."""
     try:
         if os.path.exists(UNIFIED_PIPELINE_PATH):
@@ -87,7 +89,9 @@ def load_trained_artifacts() -> tuple[object | None, object | None, float, str]:
     return None, None, 0.5, "No trained model found. Upload a dataset and train a model first."
 
 
-def predict_customers(df: pd.DataFrame, model=None, preprocessor=None, threshold: float | None = None) -> pd.DataFrame:
+def predict_customers(
+    df: pd.DataFrame, model: Any = None, preprocessor: Any = None, threshold: float | None = None
+) -> pd.DataFrame:
     opt_th = 0.5
     if model is None or preprocessor is None:
         model, preprocessor, loaded_th, status_msg = load_trained_artifacts()
@@ -149,7 +153,9 @@ def predict_customers(df: pd.DataFrame, model=None, preprocessor=None, threshold
     return results
 
 
-def predict_single_row(row: pd.Series | dict, model=None, preprocessor=None, threshold: float | None = None) -> dict:
+def predict_single_row(
+    row: pd.Series | dict, model: Any = None, preprocessor: Any = None, threshold: float | None = None
+) -> dict:
     if isinstance(row, dict):
         df = pd.DataFrame([row])
     elif isinstance(row, pd.Series):

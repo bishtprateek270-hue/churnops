@@ -7,6 +7,7 @@ holdout test set metrics evaluation, single-pass SHAP generation, and MLflow tra
 import os
 import sys
 import time
+from typing import Any
 
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -186,7 +187,7 @@ def train_and_evaluate(
     fast_mode: bool = True,
     n_optuna_trials: int = settings.FAST_MODE_TRIALS,
     allow_id_target: bool = False,
-    progress_callback: object | None = None,
+    progress_callback: Any | None = None,
 ) -> dict:
     """Train dataset-agnostic model suite with pre-fit train/holdout split, CV model selection, and single-pass holdout evaluation."""
     t_start = time.perf_counter()
@@ -370,7 +371,7 @@ def train_and_evaluate(
     for idx, name in enumerate(candidate_models):
         if progress_callback:
             progress_callback(
-                30 + int(idx * 8), f"Evaluating model candidate {idx + 1}/{len(candidate_models)}: {name}..."
+                30 + (idx * 8), f"Evaluating model candidate {idx + 1}/{len(candidate_models)}: {name}..."
             )
 
         with mlflow.start_run(run_name=name) as run:
@@ -383,26 +384,26 @@ def train_and_evaluate(
             if task_type == "classification":
                 try:
                     if name == "Logistic_Regression":
-                        params = {"max_iter": 1000, "class_weight": "balanced", **best_params}
-                        base_clf = LogisticRegression(**params, random_state=42)
+                        c_val = float(best_params["C"]) if "C" in best_params else 1.0
+                        base_clf = LogisticRegression(C=c_val, max_iter=1000, class_weight="balanced", random_state=42)
                     elif name == "Random_Forest":
-                        params = {"n_estimators": 100, "max_depth": 8, "class_weight": "balanced", **best_params}
-                        base_clf = RandomForestClassifier(**params, n_jobs=-1, random_state=42)
+                        n_est = int(best_params.get("n_estimators", 100))
+                        max_d = int(best_params.get("max_depth", 8))
+                        base_clf = RandomForestClassifier(n_estimators=n_est, max_depth=max_d, class_weight="balanced", n_jobs=-1, random_state=42)
                     elif name == "HistGradientBoosting":
-                        params = {"learning_rate": 0.1, "max_depth": 6, **best_params}
-                        base_clf = HistGradientBoostingClassifier(**params, random_state=42)
+                        lr = float(best_params.get("learning_rate", 0.1))
+                        max_d = int(best_params.get("max_depth", 6))
+                        base_clf = HistGradientBoostingClassifier(learning_rate=lr, max_depth=max_d, random_state=42)
                     elif name == "XGBoost":
-                        params = {
-                            "n_estimators": 100,
-                            "max_depth": 6,
-                            "learning_rate": 0.1,
-                            "eval_metric": "logloss",
-                            **best_params,
-                        }
-                        base_clf = XGBClassifier(**params, n_jobs=-1, random_state=42)
+                        n_est = int(best_params.get("n_estimators", 100))
+                        max_d = int(best_params.get("max_depth", 6))
+                        lr = float(best_params.get("learning_rate", 0.1))
+                        base_clf = XGBClassifier(n_estimators=n_est, max_depth=max_d, learning_rate=lr, eval_metric="logloss", n_jobs=-1, random_state=42)
                     elif name == "CatBoost":
-                        params = {"iterations": 100, "depth": 6, "learning_rate": 0.1, "verbose": 0, **best_params}
-                        base_clf = CatBoostClassifier(**params, random_seed=42, thread_count=2)
+                        iters = int(best_params.get("iterations", 100))
+                        depth = int(best_params.get("depth", 6))
+                        lr = float(best_params.get("learning_rate", 0.1))
+                        base_clf = CatBoostClassifier(iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=2)
                     else:
                         base_clf = LogisticRegression(max_iter=1000, random_state=42)
 
@@ -444,20 +445,26 @@ def train_and_evaluate(
             else:
                 try:
                     if name == "Ridge":
-                        params = {"alpha": 1.0, **best_params}
-                        reg = Ridge(**params, random_state=42)
+                        alpha_val = float(best_params.get("alpha", 1.0))
+                        reg = Ridge(alpha=alpha_val, random_state=42)
                     elif name == "Random_Forest":
-                        params = {"n_estimators": 100, "max_depth": 8, **best_params}
-                        reg = RandomForestRegressor(**params, n_jobs=-1, random_state=42)
+                        n_est = int(best_params.get("n_estimators", 100))
+                        max_d = int(best_params.get("max_depth", 8))
+                        reg = RandomForestRegressor(n_estimators=n_est, max_depth=max_d, n_jobs=-1, random_state=42)
                     elif name == "HistGradientBoosting":
-                        params = {"learning_rate": 0.1, "max_depth": 6, **best_params}
-                        reg = HistGradientBoostingRegressor(**params, random_state=42)
+                        lr = float(best_params.get("learning_rate", 0.1))
+                        max_d = int(best_params.get("max_depth", 6))
+                        reg = HistGradientBoostingRegressor(learning_rate=lr, max_depth=max_d, random_state=42)
                     elif name == "XGBoost":
-                        params = {"n_estimators": 100, "max_depth": 6, "learning_rate": 0.1, **best_params}
-                        reg = XGBRegressor(**params, n_jobs=-1, random_state=42)
+                        n_est = int(best_params.get("n_estimators", 100))
+                        max_d = int(best_params.get("max_depth", 6))
+                        lr = float(best_params.get("learning_rate", 0.1))
+                        reg = XGBRegressor(n_estimators=n_est, max_depth=max_d, learning_rate=lr, n_jobs=-1, random_state=42)
                     elif name == "CatBoost":
-                        params = {"iterations": 100, "depth": 6, "learning_rate": 0.1, "verbose": 0, **best_params}
-                        reg = CatBoostRegressor(**params, random_seed=42, thread_count=-1)
+                        iters = int(best_params.get("iterations", 100))
+                        depth = int(best_params.get("depth", 6))
+                        lr = float(best_params.get("learning_rate", 0.1))
+                        reg = CatBoostRegressor(iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=-1)
                     else:
                         reg = Ridge(random_state=42)
 

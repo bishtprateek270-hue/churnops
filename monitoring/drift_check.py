@@ -117,15 +117,15 @@ def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH
         num_cols = [c for c in ["tenure", "MonthlyCharges", "TotalCharges"] if c in df_ref.columns]
         cat_cols = [c for c in ["Contract", "InternetService"] if c in df_ref.columns]
 
-    feature_metrics = {}
+    feature_metrics: dict[str, dict[str, Any]] = {}
     max_psi = 0.0
     drift_detected = False
 
     # Check numerical features
     for col in num_cols:
         if col in df_ref.columns and col in df_act.columns:
-            exp_vals = pd.to_numeric(df_ref[col], errors="coerce").values
-            act_vals = pd.to_numeric(df_act[col], errors="coerce").values
+            exp_vals: np.ndarray = np.asarray(pd.to_numeric(df_ref[col], errors="coerce").values, dtype=float)
+            act_vals: np.ndarray = np.asarray(pd.to_numeric(df_act[col], errors="coerce").values, dtype=float)
 
             psi = calculate_psi_numerical(exp_vals, act_vals)
             ks_stat, ks_pval = compute_ks_test(exp_vals, act_vals)

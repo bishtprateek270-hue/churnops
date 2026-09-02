@@ -80,10 +80,10 @@ def calculate_classification_metrics(
 
 def calculate_regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     """Compute comprehensive regression metrics (MAE, RMSE, R2)."""
-    mae = float(mean_absolute_error(y_true, y_pred))
-    mse = float(mean_squared_error(y_true, y_pred))
-    rmse = float(np.sqrt(mse))
-    r2 = float(r2_score(y_true, y_pred))
+    mae = mean_absolute_error(y_true, y_pred)
+    mse = mean_squared_error(y_true, y_pred)
+    rmse = np.sqrt(mse)
+    r2 = r2_score(y_true, y_pred)
 
     return {
         "mae": mae,
@@ -333,7 +333,7 @@ def _get_model_version_metrics(
             f1 = metrics.get(
                 "val_f1_score", metrics.get("f1_score", metrics.get("val_roc_auc", metrics.get("roc_auc", 0.0)))
             )
-            return metrics, float(f1)
+            return metrics, f1
     except Exception as exc:
         print(f"Notice: Could not fetch metrics for model version {version}: {exc}")
     return {}, 0.0

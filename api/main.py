@@ -10,6 +10,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Any
 
 import httpx
 
@@ -48,7 +49,13 @@ ENABLE_CORS = settings.ENABLE_CORS
 CORS_ORIGINS = settings.CORS_ORIGINS
 
 # Global state loaded during lifespan
-model_store = {"model": None, "preprocessor": None, "version": "unknown", "stage": "none", "loaded_at": None}
+model_store: dict[str, Any] = {
+    "model": None,
+    "preprocessor": None,
+    "version": "unknown",
+    "stage": "none",
+    "loaded_at": None,
+}
 
 # Rate limiting storage (in production, use Redis)
 request_counts = {}
@@ -177,7 +184,7 @@ def load_model_and_preprocessor():
                 model_uri = f"models:/{MODEL_NAME}/{stage}"
                 logger.info(f"Loading MLflow model '{MODEL_NAME}' stage '{stage}' version {version}...")
                 model_store["model"] = mlflow.pyfunc.load_model(model_uri)
-                model_store["version"] = str(version)
+                model_store["version"] = version
                 model_store["stage"] = stage
                 model_store["loaded_at"] = datetime.now(timezone.utc).isoformat()
                 logger.info(f"Model loaded successfully in {time.time() - start_time:.2f}s")
@@ -213,7 +220,7 @@ def load_model_and_preprocessor():
 def check_rate_limit(request: Request):
     """Simple in-memory rate limiting (use Redis in production)."""
     global request_counts
-    client_ip = request.client.host
+    client_ip = request.client.host if request.client else "unknown"
     now = time.time()
 
     # Clean old entries

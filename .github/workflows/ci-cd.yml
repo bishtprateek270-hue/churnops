@@ -7,11 +7,33 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-jobs:
-  lint-and-test:
-    name: Lint & Unit Tests
-    runs-on: ubuntu-latest
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
+jobs:
+  lint:
+    name: Fast Code Quality & Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Ruff Linter
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+          ruff check .
+
+  unit-tests:
+    name: Unit & Integration Tests
+    needs: lint
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -27,18 +49,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Code Quality & Linting
-        run: |
-          ruff check .
-
       - name: Run Unit Tests
+        env:
+          FAST_MODE: 'true'
+          FAST_MODE_TRIALS: '2'
         run: |
           python data/generate_dataset.py
           pytest tests/ -v --tb=short
 
   retrain-and-evaluate:
     name: Model Retraining & Evaluation
-    needs: lint-and-test
+    needs: unit-tests
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
@@ -58,6 +79,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Generate Dataset & Run Retrain Pipeline
+        env:
+          FAST_MODE: 'true'
+          FAST_MODE_TRIALS: '2'
         run: |
           python data/generate_dataset.py
           python pipelines/retrain_pipeline.py
@@ -86,6 +110,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Download MLflow Tracking Store
         uses: actions/download-artifact@v4
         continue-on-error: true
@@ -100,7 +127,14 @@ jobs:
           name: model-artifacts
           path: models/
 
-      - name: Build Docker Image
-        run: |
-          docker build -t churnops-api:latest -f api/Dockerfile .
+      - name: Build Docker Image with Buildx Cache
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: api/Dockerfile
+          push: false
+          tags: churnops-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
 
