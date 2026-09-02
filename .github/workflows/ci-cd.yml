@@ -50,9 +50,6 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Unit Tests
-        env:
-          FAST_MODE: 'true'
-          FAST_MODE_TRIALS: '2'
         run: |
           python data/generate_dataset.py
           pytest tests/ -v --tb=short
@@ -79,9 +76,6 @@ jobs:
           pip install -r requirements.txt
 
       - name: Generate Dataset & Run Retrain Pipeline
-        env:
-          FAST_MODE: 'true'
-          FAST_MODE_TRIALS: '2'
         run: |
           python data/generate_dataset.py
           python pipelines/retrain_pipeline.py

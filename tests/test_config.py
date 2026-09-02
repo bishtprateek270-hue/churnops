@@ -14,14 +14,15 @@ class TestConfigSettings(unittest.TestCase):
 
     def test_default_settings(self):
         """Test default fallback settings."""
-        settings = Settings()
-        self.assertEqual(settings.MLFLOW_EXPERIMENT_NAME, "ChurnOps_Churn_Prediction")
-        self.assertEqual(settings.MODEL_NAME, "ChurnOps-Model")
-        self.assertEqual(settings.TEST_SIZE, 0.2)
-        self.assertEqual(settings.RANDOM_STATE, 42)
-        self.assertEqual(settings.FAST_MODE_TRIALS, 5)
-        self.assertEqual(settings.COST_FN, 500.0)
-        self.assertEqual(settings.COST_FP, 50.0)
+        with patch.dict(os.environ, {}, clear=True):
+            settings = Settings()
+            self.assertEqual(settings.MLFLOW_EXPERIMENT_NAME, "ChurnOps_Churn_Prediction")
+            self.assertEqual(settings.MODEL_NAME, "ChurnOps-Model")
+            self.assertEqual(settings.TEST_SIZE, 0.2)
+            self.assertEqual(settings.RANDOM_STATE, 42)
+            self.assertEqual(settings.FAST_MODE_TRIALS, 5)
+            self.assertEqual(settings.COST_FN, 500.0)
+            self.assertEqual(settings.COST_FP, 50.0)
 
     def test_environment_override(self):
         """Test overriding settings via environment variables."""
