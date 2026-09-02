@@ -107,8 +107,15 @@ def run_drift_analysis(db_path: str = DB_PATH, train_path: str = TRAIN_DATA_PATH
     total_logged_requests = len(df_act)
     print(f"Running data drift check on {total_logged_requests} production prediction logs...")
 
-    num_cols = ["tenure", "MonthlyCharges", "TotalCharges"]
-    cat_cols = ["Contract", "InternetService", "PaymentMethod", "PaperlessBilling", "OnlineSecurity", "TechSupport"]
+    exclude_cols = {"id", "timestamp", "churn_prediction", "churn_label", "churn_probability", "predicted_value", "actual_churn", "actual_value", "prediction_correct", "prediction_error", "model_version", "created_at"}
+    common_cols = [c for c in df_act.columns if c in df_ref.columns and c.lower() not in exclude_cols]
+
+    num_cols = [c for c in common_cols if pd.api.types.is_numeric_dtype(df_ref[c])]
+    cat_cols = [c for c in common_cols if c not in num_cols]
+
+    if not num_cols and not cat_cols:
+        num_cols = [c for c in ["tenure", "MonthlyCharges", "TotalCharges"] if c in df_ref.columns]
+        cat_cols = [c for c in ["Contract", "InternetService"] if c in df_ref.columns]
 
     feature_metrics = {}
     max_psi = 0.0
