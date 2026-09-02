@@ -32,7 +32,7 @@ from fastapi.security import APIKeyHeader
 from api.schemas import BatchChurnInput, BatchChurnOutput, ChurnInput, ChurnOutput, HealthResponse
 from src.config import settings
 from src.data_validation import DataValidationError, validate_data
-from src.preprocessing import load_preprocessor, prepare_data
+from src.preprocessing import find_target_col, is_identifier_column, load_preprocessor, prepare_data
 
 # Configure structured logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -291,6 +291,101 @@ if ENABLE_CORS:
     )
 
 
+@app.post("/dataset/upload")
+async def upload_dataset_api(file: Request):
+    """Upload any CSV dataset, validate structure, and return column options and preview."""
+    try:
+        form = await file.form()
+        uploaded_file = form.get("file")
+        if not uploaded_file:
+            raise HTTPException(status_code=400, detail="No CSV file uploaded.")
+
+        contents = await uploaded_file.read()
+        import io
+        df = pd.read_csv(io.BytesIO(contents))
+
+        os.makedirs("data/raw", exist_ok=True)
+        upload_path = "data/raw/user_upload.csv"
+        df.to_csv(upload_path, index=False)
+
+        detected_target = find_target_col(df)
+        target_options = [c for c in df.columns if not is_identifier_column(df, c)]
+        if not target_options:
+            target_options = list(df.columns)
+
+        preview_records = df.head(10).to_dict(orient="records")
+
+        return {
+            "status": "success",
+            "filename": uploaded_file.filename,
+            "rows": len(df),
+            "columns": list(df.columns),
+            "num_columns": len(df.columns),
+            "detected_target": detected_target,
+            "target_options": target_options,
+            "preview": preview_records,
+        }
+    except Exception as exc:
+        logger.error(f"Error processing uploaded dataset: {exc}")
+        raise HTTPException(status_code=400, detail=f"Error reading uploaded CSV: {str(exc)}") from exc
+
+
+@app.post("/dataset/train")
+async def train_dataset_api(payload: dict):
+    """Train model suite on uploaded dataset and reload active model store."""
+    try:
+        target_col = payload.get("target_col")
+        fast_mode = payload.get("fast_mode", True)
+        data_path = "data/raw/user_upload.csv" if os.path.exists("data/raw/user_upload.csv") else "data/raw/telco_churn.csv"
+
+        if not os.path.exists(data_path):
+            raise HTTPException(status_code=400, detail="No dataset found. Please upload a CSV first.")
+
+        df = pd.read_csv(data_path)
+        if target_col and target_col not in df.columns:
+            raise HTTPException(status_code=400, detail=f"Target column '{target_col}' not found in dataset.")
+
+        from src.train import train_and_evaluate
+        result = train_and_evaluate(data_path=data_path, target_col=target_col, fast_mode=fast_mode)
+
+        # Reload active model store
+        load_model_and_preprocessor()
+
+        return {
+            "status": "success",
+            "result": result,
+            "active_model": model_store.get("version", "1.0"),
+        }
+    except Exception as exc:
+        logger.error(f"Error training dataset via API: {exc}")
+        raise HTTPException(status_code=500, detail=f"Training failed: {str(exc)}") from exc
+
+
+@app.get("/dataset/preview")
+def get_dataset_preview():
+    """Get active uploaded dataset row preview and details."""
+    data_path = "data/raw/user_upload.csv" if os.path.exists("data/raw/user_upload.csv") else "data/raw/telco_churn.csv"
+    if not os.path.exists(data_path):
+        return {"has_dataset": False}
+
+    df = pd.read_csv(data_path)
+    target_col = getattr(model_store.get("preprocessor"), "target_col_", None) or find_target_col(df)
+    target_options = [c for c in df.columns if not is_identifier_column(df, c)]
+
+    return {
+        "has_dataset": True,
+        "path": data_path,
+        "rows": len(df),
+        "num_columns": len(df.columns),
+        "target_col": target_col,
+        "columns": list(df.columns),
+        "target_options": target_options,
+        "preview": df.head(10).to_dict(orient="records"),
+    }
+
+
+
+
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
     """Add request ID to all responses for tracing."""
@@ -319,644 +414,864 @@ def root():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChurnOps - Customer Churn Prediction System</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>ChurnOps - Machine Learning Studio & Monitoring</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --card-bg: rgba(30, 41, 59, 0.7);
-            --border-color: rgba(255, 255, 255, 0.1);
-            --primary-accent: #6366f1;
-            --primary-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
-            --danger-gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
+            --bg-page: #f8fafc;
+            --bg-card: #ffffff;
+            --border-color: #e2e8f0;
+            --border-hover: #cbd5e1;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --primary-light: #eef2ff;
+            --success-bg: #f0fdf4;
+            --success-text: #166534;
+            --success-border: #bbf7d0;
+            --warning-bg: #fffbeb;
+            --warning-text: #92400e;
+            --warning-border: #fde68a;
+            --danger-bg: #fef2f2;
+            --danger-text: #991b1b;
+            --danger-border: #fecaca;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         body {
-            background-color: var(--bg-dark);
-            background-image:
-                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(217, 70, 239, 0.15) 0px, transparent 50%);
-            color: var(--text-main);
+            background-color: var(--bg-page);
+            color: var(--text-primary);
             min-height: 100vh;
-            padding: 2rem 1rem;
+            line-height: 1.5;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 2rem;
-            margin-bottom: 2rem;
+        .header {
+            background: #ffffff;
             border-bottom: 1px solid var(--border-color);
-            flex-wrap: wrap;
-            gap: 1rem;
+            padding: 1rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
-        .logo-group {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .logo-badge {
-            background: var(--primary-gradient);
-            padding: 0.5rem 0.85rem;
-            border-radius: 12px;
-            font-weight: 800;
-            font-size: 1.25rem;
-            box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
-        }
-
-        .logo-title h1 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-        }
-
-        .logo-title p {
-            color: var(--text-muted);
-            font-size: 0.85rem;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
-
-        .nav-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 0.875rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        .nav-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: var(--primary-accent);
-            transform: translateY(-1px);
-        }
-
-        .preset-bar {
+        .header-content {
+            max-width: 1280px;
+            margin: 0 auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color);
-            padding: 1rem 1.5rem;
-            border-radius: 16px;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-            gap: 1rem;
         }
 
-        .preset-title {
-            font-weight: 600;
-            font-size: 0.95rem;
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .brand-icon {
+            background: var(--primary);
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.1rem;
+        }
+
+        .brand-text h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .brand-text p {
+            font-size: 0.8rem;
             color: var(--text-muted);
         }
 
-        .preset-btns {
+        .nav-actions {
             display: flex;
             gap: 0.75rem;
         }
 
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.08);
+        .btn-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 0.85rem;
+            background: #ffffff;
             border: 1px solid var(--border-color);
-            color: var(--text-main);
-            padding: 0.4rem 0.85rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
+            border-radius: 6px;
+            color: var(--text-secondary);
             font-size: 0.85rem;
-            transition: all 0.2s ease;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.15s ease;
         }
 
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.15);
+        .btn-link:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-light);
         }
 
-        .main-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 2rem;
+        .main-container {
+            max-width: 1280px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
         }
 
-        @media (max-width: 900px) {
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .form-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(16px);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
-        }
-
-        .section-header {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 1.25rem;
-            color: var(--primary-accent);
+        .tabs-nav {
             display: flex;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            padding: 0.75rem 1.25rem;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header {
+            margin-bottom: 1.25rem;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .card-desc {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .dropzone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+            background: #f8fafc;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 1.25rem;
+        }
+
+        .dropzone:hover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .dropzone input {
+            display: none;
+        }
+
+        .dropzone-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .dropzone-text {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .dropzone-sub {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.65rem 1.25rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            display: inline-flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .form-section {
-            margin-bottom: 2rem;
+        .btn-primary:hover {
+            background: var(--primary-hover);
         }
 
-        .fields-grid {
+        .btn-block {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .form-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.25rem;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.25rem;
         }
 
-        .field-group {
+        .form-group {
             display: flex;
             flex-direction: column;
-            gap: 0.4rem;
+            gap: 0.35rem;
         }
 
-        label {
-            font-size: 0.825rem;
-            font-weight: 500;
-            color: var(--text-muted);
+        .form-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
         }
 
-        select, input[type="number"] {
-            background: rgba(15, 23, 42, 0.6);
+        .form-control {
+            padding: 0.55rem 0.75rem;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.6rem 0.8rem;
-            color: var(--text-main);
+            border-radius: 6px;
             font-size: 0.9rem;
+            color: var(--text-primary);
+            background: #ffffff;
             outline: none;
-            transition: border-color 0.2s ease;
         }
 
-        select:focus, input[type="number"]:focus {
-            border-color: var(--primary-accent);
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
         }
 
-        .btn-submit {
-            background: var(--primary-gradient);
-            color: white;
-            border: none;
-            width: 100%;
-            padding: 1rem;
-            border-radius: 12px;
-            font-size: 1.05rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4);
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
             margin-top: 1rem;
         }
 
-        .btn-submit:hover {
-            opacity: 0.95;
-            transform: translateY(-2px);
-            box-shadow: 0 15px 30px -5px rgba(99, 102, 241, 0.6);
-        }
-
-        .result-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(16px);
+        .metric-tile {
+            background: #f8fafc;
             border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            position: sticky;
-            top: 2rem;
-            height: fit-content;
-            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            padding: 1rem;
         }
 
-        .gauge-container {
-            width: 160px;
-            height: 160px;
-            border-radius: 50%;
-            background: conic-gradient(var(--primary-accent) 0%, rgba(255, 255, 255, 0.1) 0%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 1.5rem 0;
-            position: relative;
-            transition: background 0.8s ease;
-        }
-
-        .gauge-inner {
-            width: 130px;
-            height: 130px;
-            background: var(--bg-dark);
-            border-radius: 50%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .gauge-value {
-            font-size: 2rem;
-            font-weight: 800;
-        }
-
-        .gauge-label {
+        .metric-name {
             font-size: 0.75rem;
+            font-weight: 600;
             color: var(--text-muted);
             text-transform: uppercase;
         }
 
-        .status-badge {
-            padding: 0.5rem 1.25rem;
-            border-radius: 50px;
-            font-weight: 700;
-            font-size: 0.9rem;
-            margin-bottom: 1.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+        .metric-val {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-top: 0.25rem;
         }
 
-        .badge-danger {
-            background: var(--danger-gradient);
-            color: white;
-            box-shadow: 0 10px 20px -5px rgba(239, 68, 68, 0.5);
+        .data-table-container {
+            overflow-x: auto;
+            max-height: 350px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-top: 1rem;
         }
 
-        .badge-success {
-            background: var(--success-gradient);
-            color: white;
-            box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.5);
-        }
-
-        .meta-list {
+        table {
             width: 100%;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            border-top: 1px solid var(--border-color);
-            padding-top: 1.25rem;
+            border-collapse: collapse;
             font-size: 0.85rem;
+            text-align: left;
         }
 
-        .meta-item {
-            display: flex;
-            justify-content: space-between;
-            color: var(--text-muted);
+        th {
+            background: #f1f5f9;
+            color: var(--text-secondary);
+            font-weight: 600;
+            padding: 0.6rem 0.85rem;
+            position: sticky;
+            top: 0;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .meta-item span:last-child {
-            color: var(--text-main);
+        td {
+            padding: 0.55rem 0.85rem;
+            border-bottom: 1px solid #f1f5f9;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
             font-weight: 600;
         }
+
+        .badge-success { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
+        .badge-warning { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
+        .badge-danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+
+        .json-preview {
+            background: #0f172a;
+            color: #38bdf8;
+            padding: 1rem;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .alert {
+            padding: 0.85rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        .alert-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+        .alert-success { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
+        .alert-warning { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
+        .alert-danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="logo-group">
-                <div class="logo-badge">⚡</div>
-                <div class="logo-title">
+    <header class="header">
+        <div class="header-content">
+            <div class="brand">
+                <div class="brand-icon">⚡</div>
+                <div class="brand-text">
                     <h1>ChurnOps</h1>
-                    <p>Enterprise Customer Churn Prediction Engine</p>
+                    <p>Machine Learning Studio & Monitoring System</p>
                 </div>
             </div>
-            <div class="nav-links">
-                <a href="/docs" target="_blank" class="nav-btn">🚀 Swagger API Docs</a>
-                <a href="/health" target="_blank" class="nav-btn">💓 Health Probe</a>
-                <a href="/metrics" target="_blank" class="nav-btn">📊 Prometheus Metrics</a>
-                <a href="https://github.com/bishtprateek270-hue/churnops" target="_blank" class="nav-btn">🐙 GitHub Repository</a>
+            <div class="nav-actions">
+                <a href="/docs" target="_blank" class="btn-link">📘 API Docs</a>
+                <a href="/health" target="_blank" class="btn-link">💓 Health Probe</a>
+                <a href="https://github.com/bishtprateek270-hue/churnops" target="_blank" class="btn-link">🐙 GitHub</a>
             </div>
-        </header>
+        </div>
+    </header>
 
-        <div class="preset-bar">
-            <span class="preset-title">Fill Quick Demo Profiles:</span>
-            <div class="preset-btns">
-                <button type="button" class="btn-secondary" onclick="loadPreset('high')">⚠️ High Churn Risk Customer</button>
-                <button type="button" class="btn-secondary" onclick="loadPreset('low')">✅ Low Churn Risk Customer</button>
+    <main class="main-container">
+        <nav class="tabs-nav">
+            <button class="tab-btn active" onclick="switchTab('tab-upload')">📁 1. Dataset Upload & Train</button>
+            <button class="tab-btn" onclick="switchTab('tab-row')">🎯 2. Predict Dataset Row</button>
+            <button class="tab-btn" onclick="switchTab('tab-batch')">⚡ 3. Batch CSV Inference</button>
+            <button class="tab-btn" onclick="switchTab('tab-custom')">📝 4. Custom Single Form</button>
+            <button class="tab-btn" onclick="switchTab('tab-health')">📊 5. Service Telemetry</button>
+        </nav>
+
+        <!-- TAB 1: UPLOAD & TRAIN -->
+        <div id="tab-upload" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Upload Any Tabular CSV Dataset</h2>
+                    <p class="card-desc">Upload classification or regression datasets (e.g. Telco Churn, Kaggle House Prices, Credit Churn). Automatic feature validation, ID filtering, and model suite evaluation.</p>
+                </div>
+
+                <div class="dropzone" onclick="document.getElementById('csvInput').click()">
+                    <input type="file" id="csvInput" accept=".csv" onchange="handleFileUpload(event)">
+                    <div class="dropzone-icon">📄</div>
+                    <div class="dropzone-text" id="dropText">Click to select or drag and drop CSV file</div>
+                    <div class="dropzone-sub">Supports tabular classification or regression datasets</div>
+                </div>
+
+                <div id="uploadStatus"></div>
+
+                <div id="datasetDetails" style="display: none;">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Total Rows</label>
+                            <input type="text" id="dsRows" class="form-control" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Total Columns</label>
+                            <input type="text" id="dsCols" class="form-control" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="targetSelect">Select Target Column (Excluded IDs)</label>
+                            <select id="targetSelect" class="form-control"></select>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 1.25rem;">
+                        <button class="btn-primary" onclick="trainModel()"><span id="trainSpinner">🚀</span> Train Leak-Free Model Suite</button>
+                    </div>
+
+                    <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">Dataset Preview (First 10 Rows)</h3>
+                    <div class="data-table-container">
+                        <table id="previewTable"></table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="trainingResultsCard" class="card" style="display: none;">
+                <div class="card-header">
+                    <h2 class="card-title" id="bestModelTitle">Training Results</h2>
+                    <p class="card-desc" id="trainMetaSub">Model evaluation metrics on untouched holdout test set.</p>
+                </div>
+                <div class="metrics-grid" id="metricsGrid"></div>
             </div>
         </div>
 
-        <div class="main-grid">
-            <div class="form-card">
-                <form id="churnForm">
-                    <div class="form-section">
-                        <div class="section-header">👤 Customer Profile & Demographics</div>
-                        <div class="fields-grid">
-                            <div class="field-group">
-                                <label for="gender">Gender</label>
-                                <select id="gender">
-                                    <option value="Female">Female</option>
-                                    <option value="Male">Male</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="SeniorCitizen">Senior Citizen</label>
-                                <select id="SeniorCitizen">
-                                    <option value="0">No (0)</option>
-                                    <option value="1">Yes (1)</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="Partner">Partner</label>
-                                <select id="Partner">
-                                    <option value="Yes">Yes</option>
-                                    <option value="No">No</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="Dependents">Dependents</label>
-                                <select id="Dependents">
-                                    <option value="No">No</option>
-                                    <option value="Yes">Yes</option>
-                                </select>
-                            </div>
+        <!-- TAB 2: ROW PREDICTOR -->
+        <div id="tab-row" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Select Dataset Row for Prediction</h2>
+                    <p class="card-desc">Select any row index from the active dataset. Identifier and target columns are automatically removed before running model prediction.</p>
+                </div>
+
+                <div class="form-grid" style="max-width: 400px;">
+                    <div class="form-group">
+                        <label class="form-label" for="rowIndexInput">Dataset Row Index</label>
+                        <input type="number" id="rowIndexInput" class="form-control" value="0" min="0" onchange="loadRowPreview()">
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1rem;">
+                    <button class="btn-primary" onclick="predictRow()"><span id="predictRowSpinner">⚡</span> Predict Selected Row</button>
+                </div>
+
+                <div id="rowOutputContainer" style="display: none;">
+                    <div class="metrics-grid" id="rowResultMetrics" style="margin-bottom: 1.25rem;"></div>
+
+                    <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">Clean Row Features JSON (ID & Target Stripped)</h3>
+                    <pre class="json-preview" id="rowJsonPreview"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: BATCH CSV -->
+        <div id="tab-batch" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Batch CSV Inference</h2>
+                    <p class="card-desc">Generate predictions for multiple records at once and export results as CSV.</p>
+                </div>
+
+                <div class="form-grid" style="max-width: 400px;">
+                    <div class="form-group">
+                        <label class="form-label" for="batchLimit">Rows Count Limit</label>
+                        <input type="number" id="batchLimit" class="form-control" value="50" min="5" max="500">
+                    </div>
+                </div>
+
+                <button class="btn-primary" onclick="runBatchPrediction()">⚡ Run Batch Prediction</button>
+
+                <div id="batchResultsContainer" style="display: none; margin-top: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h3 style="font-size: 0.95rem; font-weight: 700;">Batch Predictions Output</h3>
+                        <button class="btn-link" onclick="downloadBatchCSV()">📥 Download CSV</button>
+                    </div>
+                    <div class="data-table-container">
+                        <table id="batchTable"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: CUSTOM SINGLE INPUT -->
+        <div id="tab-custom" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Custom Single Feature Input</h2>
+                    <p class="card-desc">Fill quick demo profiles or manually adjust features for instant inference.</p>
+                </div>
+
+                <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <button class="btn-link" onclick="fillPreset('high')">⚠️ High Risk Customer Preset</button>
+                    <button class="btn-link" onclick="fillPreset('low')">✅ Low Risk Customer Preset</button>
+                </div>
+
+                <form id="customForm" onsubmit="submitCustomForm(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Tenure (Months)</label>
+                            <input type="number" id="tenure" class="form-control" value="12">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Internet Service</label>
+                            <select id="InternetService" class="form-control">
+                                <option value="Fiber optic">Fiber optic</option>
+                                <option value="DSL">DSL</option>
+                                <option value="No">No</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contract Type</label>
+                            <select id="Contract" class="form-control">
+                                <option value="Month-to-month">Month-to-month</option>
+                                <option value="One year">One year</option>
+                                <option value="Two year">Two year</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Monthly Charges ($)</label>
+                            <input type="number" step="0.01" id="MonthlyCharges" class="form-control" value="70.35">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Total Charges ($)</label>
+                            <input type="number" step="0.01" id="TotalCharges" class="form-control" value="844.20">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Payment Method</label>
+                            <select id="PaymentMethod" class="form-control">
+                                <option value="Electronic check">Electronic check</option>
+                                <option value="Bank transfer (automatic)">Bank transfer (automatic)</option>
+                                <option value="Credit card (automatic)">Credit card (automatic)</option>
+                                <option value="Mailed check">Mailed check</option>
+                            </select>
                         </div>
                     </div>
 
-                    <div class="form-section">
-                        <div class="section-header">📶 Subscribed Services</div>
-                        <div class="fields-grid">
-                            <div class="field-group">
-                                <label for="tenure">Tenure (Months)</label>
-                                <input type="number" id="tenure" value="12" min="0" max="100">
-                            </div>
-                            <div class="field-group">
-                                <label for="PhoneService">Phone Service</label>
-                                <select id="PhoneService">
-                                    <option value="Yes">Yes</option>
-                                    <option value="No">No</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="MultipleLines">Multiple Lines</label>
-                                <select id="MultipleLines">
-                                    <option value="No">No</option>
-                                    <option value="Yes">Yes</option>
-                                    <option value="No phone service">No phone service</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="InternetService">Internet Service</label>
-                                <select id="InternetService">
-                                    <option value="Fiber optic">Fiber optic</option>
-                                    <option value="DSL">DSL</option>
-                                    <option value="No">No</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="OnlineSecurity">Online Security</label>
-                                <select id="OnlineSecurity">
-                                    <option value="No">No</option>
-                                    <option value="Yes">Yes</option>
-                                    <option value="No internet service">No internet service</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="OnlineBackup">Online Backup</label>
-                                <select id="OnlineBackup">
-                                    <option value="No">No</option>
-                                    <option value="Yes">Yes</option>
-                                    <option value="No internet service">No internet service</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="DeviceProtection">Device Protection</label>
-                                <select id="DeviceProtection">
-                                    <option value="No">No</option>
-                                    <option value="Yes">Yes</option>
-                                    <option value="No internet service">No internet service</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="TechSupport">Tech Support</label>
-                                <select id="TechSupport">
-                                    <option value="No">No</option>
-                                    <option value="Yes">Yes</option>
-                                    <option value="No internet service">No internet service</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="StreamingTV">Streaming TV</label>
-                                <select id="StreamingTV">
-                                    <option value="No">No</option>
-                                    <option value="Yes">Yes</option>
-                                    <option value="No internet service">No internet service</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="StreamingMovies">Streaming Movies</label>
-                                <select id="StreamingMovies">
-                                    <option value="No">No</option>
-                                    <option value="Yes">Yes</option>
-                                    <option value="No internet service">No internet service</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-section">
-                        <div class="section-header">💳 Billing & Contract Information</div>
-                        <div class="fields-grid">
-                            <div class="field-group">
-                                <label for="Contract">Contract Type</label>
-                                <select id="Contract">
-                                    <option value="Month-to-month">Month-to-month</option>
-                                    <option value="One year">One year</option>
-                                    <option value="Two year">Two year</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="PaperlessBilling">Paperless Billing</label>
-                                <select id="PaperlessBilling">
-                                    <option value="Yes">Yes</option>
-                                    <option value="No">No</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="PaymentMethod">Payment Method</label>
-                                <select id="PaymentMethod">
-                                    <option value="Electronic check">Electronic check</option>
-                                    <option value="Mailed check">Mailed check</option>
-                                    <option value="Bank transfer (automatic)">Bank transfer (automatic)</option>
-                                    <option value="Credit card (automatic)">Credit card (automatic)</option>
-                                </select>
-                            </div>
-                            <div class="field-group">
-                                <label for="MonthlyCharges">Monthly Charges ($)</label>
-                                <input type="number" id="MonthlyCharges" value="70.35" step="0.01">
-                            </div>
-                            <div class="field-group">
-                                <label for="TotalCharges">Total Charges ($)</label>
-                                <input type="number" id="TotalCharges" value="844.20" step="0.01">
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn-submit">⚡ Run Live Churn Prediction</button>
+                    <button type="submit" class="btn-primary">⚡ Run Live Prediction</button>
                 </form>
-            </div>
 
-            <div class="result-card">
-                <h3>Prediction Analytics</h3>
-
-                <div class="gauge-container" id="gauge">
-                    <div class="gauge-inner">
-                        <div class="gauge-value" id="probValue">--%</div>
-                        <div class="gauge-label">Probability</div>
-                    </div>
-                </div>
-
-                <div class="status-badge badge-success" id="statusBadge">Awaiting Input</div>
-
-                <div class="meta-list">
-                    <div class="meta-item">
-                        <span>Prediction Outcome:</span>
-                        <span id="labelValue">Pending</span>
-                    </div>
-                    <div class="meta-item">
-                        <span>Inference Latency:</span>
-                        <span id="latencyValue">-- ms</span>
-                    </div>
-                    <div class="meta-item">
-                        <span>Active Model Stage:</span>
-                        <span id="stageValue">Production</span>
-                    </div>
-                    <div class="meta-item">
-                        <span>Model Version:</span>
-                        <span id="versionValue">v1.0</span>
-                    </div>
+                <div id="customResult" style="display: none; margin-top: 1.25rem;">
+                    <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">Prediction Output</h3>
+                    <pre class="json-preview" id="customJsonOutput"></pre>
                 </div>
             </div>
         </div>
-    </div>
+
+        <!-- TAB 5: TELEMETRY & HEALTH -->
+        <div id="tab-health" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Service Telemetry & Environment Health</h2>
+                    <p class="card-desc">Active model store state, database logging health, and endpoint URLs.</p>
+                </div>
+
+                <div class="metrics-grid" id="healthMetrics"></div>
+
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin: 1.25rem 0 0.5rem 0;">Health Response Payload</h3>
+                <pre class="json-preview" id="healthJson"></pre>
+            </div>
+        </div>
+    </main>
 
     <script>
-        const highRisk = {
-            gender: "Female", SeniorCitizen: 1, Partner: "No", Dependents: "No", tenure: 2,
-            PhoneService: "Yes", MultipleLines: "No", InternetService: "Fiber optic",
-            OnlineSecurity: "No", OnlineBackup: "No", DeviceProtection: "No", TechSupport: "No",
-            StreamingTV: "Yes", StreamingMovies: "Yes", Contract: "Month-to-month",
-            PaperlessBilling: "Yes", PaymentMethod: "Electronic check", MonthlyCharges: 95.70, TotalCharges: 191.40
-        };
+        let activeDataset = null;
+        let batchResultsData = null;
 
-        const lowRisk = {
-            gender: "Male", SeniorCitizen: 0, Partner: "Yes", Dependents: "Yes", tenure: 60,
-            PhoneService: "Yes", MultipleLines: "Yes", InternetService: "DSL",
-            OnlineSecurity: "Yes", OnlineBackup: "Yes", DeviceProtection: "Yes", TechSupport: "Yes",
-            StreamingTV: "Yes", StreamingMovies: "Yes", Contract: "Two year",
-            PaperlessBilling: "No", PaymentMethod: "Credit card (automatic)", MonthlyCharges: 85.10, TotalCharges: 5106.00
-        };
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-        function loadPreset(type) {
-            const data = type === 'high' ? highRisk : lowRisk;
-            for (const key in data) {
-                const el = document.getElementById(key);
-                if (el) el.value = data[key];
+            event.currentTarget.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+
+            if (tabId === 'tab-row' && activeDataset) {
+                loadRowPreview();
             }
-            document.getElementById('churnForm').dispatchEvent(new Event('submit'));
+            if (tabId === 'tab-health') {
+                loadHealthTelemetry();
+            }
         }
 
-        document.getElementById('churnForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+        async function initPage() {
+            try {
+                const res = await fetch('/dataset/preview');
+                const data = await res.json();
+                if (data.has_dataset) {
+                    activeDataset = data;
+                    renderDatasetInfo(data);
+                }
+            } catch(e) {}
+        }
 
-            const payload = {
-                gender: document.getElementById('gender').value,
-                SeniorCitizen: parseInt(document.getElementById('SeniorCitizen').value),
-                Partner: document.getElementById('Partner').value,
-                Dependents: document.getElementById('Dependents').value,
-                tenure: parseInt(document.getElementById('tenure').value),
-                PhoneService: document.getElementById('PhoneService').value,
-                MultipleLines: document.getElementById('MultipleLines').value,
-                InternetService: document.getElementById('InternetService').value,
-                OnlineSecurity: document.getElementById('OnlineSecurity').value,
-                OnlineBackup: document.getElementById('OnlineBackup').value,
-                DeviceProtection: document.getElementById('DeviceProtection').value,
-                TechSupport: document.getElementById('TechSupport').value,
-                StreamingTV: document.getElementById('StreamingTV').value,
-                StreamingMovies: document.getElementById('StreamingMovies').value,
-                Contract: document.getElementById('Contract').value,
-                PaperlessBilling: document.getElementById('PaperlessBilling').value,
-                PaymentMethod: document.getElementById('PaymentMethod').value,
-                MonthlyCharges: parseFloat(document.getElementById('MonthlyCharges').value),
-                TotalCharges: parseFloat(document.getElementById('TotalCharges').value)
-            };
+        async function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('dropText').innerText = `Selected: ${file.name}`;
+            const formData = new FormData();
+            formData.append('file', file);
+
+            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">Uploading and validating CSV...</div>';
 
             try {
-                const startTime = performance.now();
-                const res = await fetch('/predict', {
+                const res = await fetch('/dataset/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (res.ok) {
+                    activeDataset = data;
+                    document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-success">✅ Loaded ${data.rows} rows, ${data.num_columns} columns. Detected target: '${data.detected_target}'</div>`;
+                    renderDatasetInfo(data);
+                } else {
+                    document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-danger">❌ ${data.detail || 'Upload failed'}</div>`;
+                }
+            } catch (err) {
+                document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-danger">❌ Error uploading file: ${err.message}</div>`;
+            }
+        }
+
+        function renderDatasetInfo(data) {
+            document.getElementById('dsRows').value = data.rows;
+            document.getElementById('dsCols').value = data.num_columns;
+
+            const select = document.getElementById('targetSelect');
+            select.innerHTML = '';
+            data.target_options.forEach(opt => {
+                const el = document.createElement('option');
+                el.value = opt;
+                el.innerText = opt;
+                if (opt === data.detected_target) el.selected = true;
+                select.appendChild(el);
+            });
+
+            document.getElementById('datasetDetails').style.display = 'block';
+            renderTable('previewTable', data.preview);
+        }
+
+        function renderTable(tableId, records) {
+            if (!records || !records.length) return;
+            const table = document.getElementById(tableId);
+            table.innerHTML = '';
+
+            const cols = Object.keys(records[0]);
+            let thead = '<thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead>';
+            let tbody = '<tbody>' + records.map(r => '<tr>' + cols.map(c => `<td>${r[c] !== null ? r[c] : ''}</td>`).join('') + '</tr>').join('') + '</tbody>';
+
+            table.innerHTML = thead + tbody;
+        }
+
+        async function trainModel() {
+            const target_col = document.getElementById('targetSelect').value;
+            document.getElementById('trainSpinner').innerText = '⏳';
+            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">⏳ Training model suite... Please wait...</div>';
+
+            try {
+                const res = await fetch('/dataset/train', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ target_col: target_col, fast_mode: true })
                 });
 
                 const data = await res.json();
-                const endTime = performance.now();
-                const latency = Math.round(endTime - startTime);
+                document.getElementById('trainSpinner').innerText = '🚀';
 
-                if (res.ok) {
-                    const prob = Math.round(data.churn_probability * 100);
-                    document.getElementById('probValue').innerText = prob + '%';
-                    document.getElementById('labelValue').innerText = data.churn_label === 'Yes' ? 'HIGH CHURN RISK' : 'LOW CHURN RISK';
-                    document.getElementById('latencyValue').innerText = (data.processing_time_ms || latency) + ' ms';
-                    document.getElementById('versionValue').innerText = data.model_version || '1.0';
-
-                    const gauge = document.getElementById('gauge');
-                    const badge = document.getElementById('statusBadge');
-
-                    if (data.churn_prediction === 1) {
-                        gauge.style.background = `conic-gradient(#ef4444 ${prob}%, rgba(255, 255, 255, 0.1) 0%)`;
-                        badge.className = 'status-badge badge-danger';
-                        badge.innerText = 'HIGH CHURN RISK';
-                    } else {
-                        gauge.style.background = `conic-gradient(#10b981 ${prob}%, rgba(255, 255, 255, 0.1) 0%)`;
-                        badge.className = 'status-badge badge-success';
-                        badge.innerText = 'LOW CHURN RISK';
-                    }
+                if (res.ok && data.status === 'success') {
+                    document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-success">🎉 Training complete! Best Model: <strong>${data.result.best_model_name}</strong> in ${data.result.total_time_seconds}s</div>`;
+                    renderResults(data.result);
                 } else {
-                    alert('Prediction failed: ' + (data.detail || 'Unknown error'));
+                    document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-danger">❌ Training failed: ${data.detail || 'Error'}</div>`;
                 }
             } catch (err) {
-                alert('Error connecting to API: ' + err.message);
+                document.getElementById('trainSpinner').innerText = '🚀';
+                document.getElementById('uploadStatus').innerHTML = `<div class="alert alert-danger">❌ Error during training: ${err.message}</div>`;
             }
-        });
+        }
 
-        // Initial prediction on load
-        window.addEventListener('load', () => {
-            document.getElementById('churnForm').dispatchEvent(new Event('submit'));
-        });
+        function renderResults(result) {
+            const card = document.getElementById('trainingResultsCard');
+            card.style.display = 'block';
+            document.getElementById('bestModelTitle').innerText = `Holdout Test Metrics — Best Model: ${result.best_model_name.replace(/_/g, ' ')}`;
+
+            const metrics = result.best_test_metrics || {};
+            const grid = document.getElementById('metricsGrid');
+            grid.innerHTML = '';
+
+            for (const [k, v] of Object.entries(metrics)) {
+                let displayVal = v;
+                if (typeof v === 'number') {
+                    displayVal = (k.includes('accuracy') || k.includes('precision') || k.includes('recall')) ? (v * 100).toFixed(1) + '%' : v.toFixed(4);
+                }
+                grid.innerHTML += `<div class="metric-tile"><div class="metric-name">${k.replace(/_/g, ' ')}</div><div class="metric-val">${displayVal}</div></div>`;
+            }
+        }
+
+        function loadRowPreview() {
+            if (!activeDataset || !activeDataset.preview) return;
+            const idx = parseInt(document.getElementById('rowIndexInput').value) || 0;
+            const rowData = activeDataset.preview[idx % activeDataset.preview.length] || {};
+
+            const cleanRow = { ...rowData };
+            delete cleanRow[activeDataset.target_col];
+            delete cleanRow['Id'];
+            delete cleanRow['customerID'];
+
+            document.getElementById('rowJsonPreview').innerText = JSON.stringify(cleanRow, null, 2);
+            document.getElementById('rowOutputContainer').style.display = 'block';
+        }
+
+        async function predictRow() {
+            if (!activeDataset || !activeDataset.preview) return;
+            const idx = parseInt(document.getElementById('rowIndexInput').value) || 0;
+            const rowData = activeDataset.preview[idx % activeDataset.preview.length] || {};
+
+            document.getElementById('predictRowSpinner').innerText = '⏳';
+
+            try {
+                const res = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(rowData)
+                });
+
+                const data = await res.json();
+                document.getElementById('predictRowSpinner').innerText = '⚡';
+
+                if (res.ok) {
+                    const grid = document.getElementById('rowResultMetrics');
+                    const actualVal = rowData[activeDataset.target_col] !== undefined ? rowData[activeDataset.target_col] : 'Unknown';
+
+                    grid.innerHTML = `
+                        <div class="metric-tile"><div class="metric-name">Predicted Outcome</div><div class="metric-val">${data.churn_label}</div></div>
+                        <div class="metric-tile"><div class="metric-name">Confidence Probability</div><div class="metric-val">${(data.churn_probability * 100).toFixed(1)}%</div></div>
+                        <div class="metric-tile"><div class="metric-name">Actual Label</div><div class="metric-val">${actualVal}</div></div>
+                        <div class="metric-tile"><div class="metric-name">Inference Latency</div><div class="metric-val">${data.processing_time_ms} ms</div></div>
+                    `;
+                }
+            } catch(e) {
+                document.getElementById('predictRowSpinner').innerText = '⚡';
+            }
+        }
+
+        async function runBatchPrediction() {
+            const limit = parseInt(document.getElementById('batchLimit').value) || 50;
+            if (!activeDataset || !activeDataset.preview) return;
+
+            const samples = activeDataset.preview.slice(0, limit);
+            const res = await fetch('/predict/batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customers: samples })
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                batchResultsData = data.results;
+                renderTable('batchTable', data.results);
+                document.getElementById('batchResultsContainer').style.display = 'block';
+            }
+        }
+
+        function downloadBatchCSV() {
+            if (!batchResultsData) return;
+            const keys = Object.keys(batchResultsData[0]);
+            let csv = keys.join(',') + '\n';
+            batchResultsData.forEach(r => {
+                csv += keys.map(k => r[k]).join(',') + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'batch_predictions.csv';
+            a.click();
+        }
+
+        function fillPreset(type) {
+            if (type === 'high') {
+                document.getElementById('tenure').value = 2;
+                document.getElementById('InternetService').value = 'Fiber optic';
+                document.getElementById('Contract').value = 'Month-to-month';
+                document.getElementById('MonthlyCharges').value = 95.70;
+                document.getElementById('TotalCharges').value = 191.40;
+            } else {
+                document.getElementById('tenure').value = 60;
+                document.getElementById('InternetService').value = 'DSL';
+                document.getElementById('Contract').value = 'Two year';
+                document.getElementById('MonthlyCharges').value = 85.10;
+                document.getElementById('TotalCharges').value = 5106.00;
+            }
+        }
+
+        async function submitCustomForm(e) {
+            e.preventDefault();
+            const payload = {
+                tenure: parseInt(document.getElementById('tenure').value),
+                InternetService: document.getElementById('InternetService').value,
+                Contract: document.getElementById('Contract').value,
+                MonthlyCharges: parseFloat(document.getElementById('MonthlyCharges').value),
+                TotalCharges: parseFloat(document.getElementById('TotalCharges').value),
+                PaymentMethod: document.getElementById('PaymentMethod').value,
+            };
+
+            const res = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            document.getElementById('customJsonOutput').innerText = JSON.stringify(data, null, 2);
+            document.getElementById('customResult').style.display = 'block';
+        }
+
+        async function loadHealthTelemetry() {
+            const res = await fetch('/health');
+            const data = await res.json();
+            document.getElementById('healthJson').innerText = JSON.stringify(data, null, 2);
+
+            const grid = document.getElementById('healthMetrics');
+            grid.innerHTML = `
+                <div class="metric-tile"><div class="metric-name">Service Status</div><div class="metric-val" style="color: #166534;">${data.status.toUpperCase()}</div></div>
+                <div class="metric-tile"><div class="metric-name">Active Model</div><div class="metric-val">${data.model_name}</div></div>
+                <div class="metric-tile"><div class="metric-name">Stage / Version</div><div class="metric-val">${data.model_stage} (v${data.model_version})</div></div>
+                <div class="metric-tile"><div class="metric-name">Preprocessor</div><div class="metric-val">${data.preprocessor_loaded ? 'Loaded' : 'None'}</div></div>
+            `;
+        }
+
+        window.addEventListener('load', initPage);
     </script>
 </body>
 </html>"""
