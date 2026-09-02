@@ -1,4 +1,5 @@
 import importlib
+import io
 import os
 import sys
 
@@ -26,7 +27,7 @@ st.set_page_config(page_title="ChurnOps | Train & Predict", page_icon="🎯", la
 
 st.title("🎯 Dataset-Agnostic Train & Predict Studio")
 st.markdown(
-    "Upload **any** classification or regression CSV dataset. Select your target column, train a leak-free model suite "
+    "Upload or load **any** classification or regression dataset. Select your target column, train a leak-free model suite "
     "with Optuna tuning, and run custom or batch predictions."
 )
 
@@ -41,59 +42,212 @@ if "model_ready" not in st.session_state:
         "models/best_model.joblib"
     )
 
-st.subheader("1. Upload Dataset & Target Selection")
-uploaded_file = st.file_uploader(
-    "Upload CSV Dataset",
-    type=["csv"],
-    help="Upload any dataset CSV with feature columns and a target column (classification or regression).",
+
+def robust_load_dataframe(source, filename: str = "") -> pd.DataFrame:
+    """Robust multi-format and multi-encoding data loader.
+    Supports CSV, TSV, TXT, Excel (XLSX, XLS), Parquet, and JSON.
+    Automatically handles encodings (utf-8, utf-8-sig, cp1252, latin1, etc.) and delimiters.
+    """
+    fn_lower = filename.lower()
+
+    # 1. Excel files
+    if fn_lower.endswith((".xlsx", ".xls", ".xlsm")):
+        if hasattr(source, "seek"):
+            source.seek(0)
+        return pd.read_excel(source)
+
+    # 2. Parquet files
+    if fn_lower.endswith(".parquet"):
+        if hasattr(source, "seek"):
+            source.seek(0)
+        return pd.read_parquet(source)
+
+    # 3. JSON files
+    if fn_lower.endswith(".json"):
+        if hasattr(source, "seek"):
+            source.seek(0)
+        return pd.read_json(source)
+
+    # 4. Text/CSV/TSV/TXT files with encoding and delimiter fallbacks
+    encodings = ["utf-8", "utf-8-sig", "latin1", "cp1252", "iso-8859-1", "utf-16"]
+    delimiters = [None, ",", ";", "\t", "|"]
+
+    last_err = None
+    for enc in encodings:
+        for sep in delimiters:
+            try:
+                if hasattr(source, "seek"):
+                    source.seek(0)
+                if sep is None:
+                    df = pd.read_csv(source, sep=None, engine="python", encoding=enc)
+                else:
+                    df = pd.read_csv(source, sep=sep, encoding=enc)
+                if len(df.columns) > 0:
+                    return df
+            except Exception as e:
+                last_err = e
+                continue
+
+    # Fallback to Excel just in case
+    try:
+        if hasattr(source, "seek"):
+            source.seek(0)
+        return pd.read_excel(source)
+    except Exception:
+        pass
+
+    raise ValueError(f"Could not parse file with any supported format or encoding. Error: {last_err}")
+
+
+st.subheader("1. Load Dataset & Select Target")
+
+tab_upload, tab_local, tab_samples, tab_paste = st.tabs(
+    ["📤 Drag & Drop / Browse Files", "📁 Local File Path", "⚡ Quick Sample Datasets", "📝 Paste Raw CSV Data"]
 )
 
-if uploaded_file is not None:
-    try:
-        df = pd.read_csv(uploaded_file)
-        st.session_state.uploaded_df = df
-        st.success(f"Loaded **{len(df):,}** rows and **{len(df.columns)}** columns.")
-        st.dataframe(df.head(10), use_container_width=True)
+with tab_upload:
+    uploaded_file = st.file_uploader(
+        "Choose a file from your computer (Drag & Drop or Browse)",
+        type=["csv", "xlsx", "xls", "tsv", "parquet", "json", "txt"],
+        help="Supports CSV, Excel (.xlsx/.xls), TSV, Parquet, JSON, and text tables.",
+        key="main_file_uploader",
+    )
+    if uploaded_file is not None:
+        try:
+            loaded_df = robust_load_dataframe(uploaded_file, filename=uploaded_file.name)
+            st.session_state.uploaded_df = loaded_df
+            save_uploaded_dataset(loaded_df)
+            st.success(
+                f"✅ Successfully opened `{uploaded_file.name}` ({len(loaded_df):,} rows, {len(loaded_df.columns)} columns)"
+            )
+        except Exception as exc:
+            st.error(f"⚠️ Error reading file `{uploaded_file.name}`: {exc}")
 
-        detected_target = find_target_col(df)
-        target_options = [c for c in df.columns if not is_identifier_column(df, c)]
-        if not target_options:
-            target_options = list(df.columns)
-        default_idx = target_options.index(detected_target) if detected_target in target_options else 0
+with tab_local:
+    local_path = st.text_input(
+        "Enter full or relative file path on your machine:",
+        value="data/raw/telco_churn.csv",
+        help="Example: data/raw/telco_churn.csv or C:/Users/.../my_dataset.csv",
+        key="local_file_input",
+    )
+    if st.button("📂 Load Local File", key="btn_load_local"):
+        if os.path.exists(local_path):
+            try:
+                loaded_df = robust_load_dataframe(local_path, filename=local_path)
+                st.session_state.uploaded_df = loaded_df
+                save_uploaded_dataset(loaded_df)
+                st.success(
+                    f"✅ Successfully loaded `{local_path}` ({len(loaded_df):,} rows, {len(loaded_df.columns)} columns)"
+                )
+            except Exception as exc:
+                st.error(f"⚠️ Error opening file `{local_path}`: {exc}")
+        else:
+            st.error(f"❌ File not found at path: `{local_path}`. Please verify the file path.")
 
-        st.session_state.target_col = st.selectbox(
-            "Select Target Column for Supervised Training:",
-            options=target_options,
-            index=default_idx,
-            help="Select the column containing the target variable to predict.",
+with tab_samples:
+    st.markdown("Instantly test and train with pre-packaged datasets:")
+    s_col1, s_col2, s_col3 = st.columns(3)
+    with s_col1:
+        if st.button("📞 Telco Churn Dataset (Classification)", use_container_width=True, key="btn_sample_telco"):
+            telco_path = "data/raw/telco_churn.csv"
+            if not os.path.exists(telco_path):
+                from data.generate_dataset import generate_telco_churn_data
+
+                loaded_df = generate_telco_churn_data()
+                os.makedirs(os.path.dirname(telco_path), exist_ok=True)
+                loaded_df.to_csv(telco_path, index=False)
+            else:
+                loaded_df = pd.read_csv(telco_path)
+            st.session_state.uploaded_df = loaded_df
+            save_uploaded_dataset(loaded_df)
+            st.success(
+                f"✅ Loaded Telco Customer Churn Dataset ({len(loaded_df):,} rows, {len(loaded_df.columns)} columns)"
+            )
+    with s_col2:
+        if st.button("🏠 California Housing (Regression)", use_container_width=True, key="btn_sample_housing"):
+            try:
+                from sklearn.datasets import fetch_california_housing
+
+                housing = fetch_california_housing(as_frame=True)
+                loaded_df = housing.frame.head(1000)
+                st.session_state.uploaded_df = loaded_df
+                save_uploaded_dataset(loaded_df)
+                st.success(
+                    f"✅ Loaded California Housing Dataset ({len(loaded_df):,} rows, {len(loaded_df.columns)} columns)"
+                )
+            except Exception as exc:
+                st.error(f"Could not load sample: {exc}")
+    with s_col3:
+        if st.button("🌸 Customer Segments / Iris (Classification)", use_container_width=True, key="btn_sample_iris"):
+            try:
+                from sklearn.datasets import load_iris
+
+                iris = load_iris(as_frame=True)
+                loaded_df = iris.frame
+                st.session_state.uploaded_df = loaded_df
+                save_uploaded_dataset(loaded_df)
+                st.success(
+                    f"✅ Loaded Iris Benchmark Dataset ({len(loaded_df):,} rows, {len(loaded_df.columns)} columns)"
+                )
+            except Exception as exc:
+                st.error(f"Could not load sample: {exc}")
+
+with tab_paste:
+    raw_text = st.text_area(
+        "Paste CSV / TSV text data here:",
+        height=140,
+        placeholder="customerID,gender,MonthlyCharges,TotalCharges,Churn\n1001,Female,29.85,29.85,No\n1002,Male,56.95,1889.5,No",
+        key="raw_text_input",
+    )
+    if st.button("📥 Load Pasted Data", key="btn_load_pasted"):
+        if raw_text.strip():
+            try:
+                buf = io.StringIO(raw_text.strip())
+                loaded_df = pd.read_csv(buf, sep=None, engine="python")
+                st.session_state.uploaded_df = loaded_df
+                save_uploaded_dataset(loaded_df)
+                st.success(f"✅ Loaded pasted data ({len(loaded_df):,} rows, {len(loaded_df.columns)} columns)")
+            except Exception as exc:
+                st.error(f"⚠️ Error parsing pasted text: {exc}")
+        else:
+            st.warning("Please paste some table or CSV data first.")
+
+df = st.session_state.uploaded_df
+if df is not None:
+    st.markdown("#### 📋 Dataset Preview & Target Selection")
+    st.dataframe(df.head(10), use_container_width=True)
+
+    detected_target = find_target_col(df)
+    target_options = [c for c in df.columns if not is_identifier_column(df, c)]
+    if not target_options:
+        target_options = list(df.columns)
+    default_idx = target_options.index(detected_target) if detected_target in target_options else 0
+
+    st.session_state.target_col = st.selectbox(
+        "Select Target Column for Supervised Training:",
+        options=target_options,
+        index=default_idx,
+        help="Select the column containing the target variable to predict.",
+    )
+
+    inferred_task = infer_task_type(df[st.session_state.target_col])
+    is_id_target = is_identifier_column(df, st.session_state.target_col)
+    if is_id_target:
+        st.warning(
+            f"⚠️ Column `{st.session_state.target_col}` appears to be a unique row identifier, not a predictable target variable."
         )
+        allow_id_target = st.checkbox(
+            "I understand and want to train on this identifier column anyway", value=False, key="id_target_chk"
+        )
+    else:
+        allow_id_target = False
+        st.info(f"💡 Auto-detected Task Type: **{inferred_task.upper()}** for target `{st.session_state.target_col}`.")
 
-        inferred_task = infer_task_type(df[st.session_state.target_col])
-        is_id_target = is_identifier_column(df, st.session_state.target_col)
-        if is_id_target:
-            st.warning(
-                f"⚠️ Column `{st.session_state.target_col}` appears to be a unique row identifier, not a predictable target variable."
-            )
-            allow_id_target = st.checkbox(
-                "I understand and want to train on this identifier column anyway", value=False, key="id_target_chk"
-            )
-        else:
-            allow_id_target = False
-            st.info(
-                f"💡 Auto-detected Task Type: **{inferred_task.upper()}** for target `{st.session_state.target_col}`."
-            )
-
-        is_valid, message = validate_upload(df, target_col=st.session_state.target_col)
-        if is_valid:
-            st.success(message)
-        else:
-            st.error(message)
-
-        if st.button("💾 Save Dataset", use_container_width=False):
-            path = save_uploaded_dataset(df)
-            st.success(f"Saved to `{path}`")
-    except Exception as exc:
-        st.error(f"⚠️ Error reading uploaded CSV: {exc}")
+    is_valid, message = validate_upload(df, target_col=st.session_state.target_col)
+    if is_valid:
+        st.success(message)
+    else:
+        st.error(message)
 
 st.divider()
 st.subheader("2. Train Model Suite")
