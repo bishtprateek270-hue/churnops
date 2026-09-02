@@ -1255,9 +1255,9 @@ def root():
         function downloadBatchCSV() {
             if (!batchResultsData) return;
             const keys = Object.keys(batchResultsData[0]);
-            let csv = keys.join(',') + '\n';
+            let csv = keys.join(',') + '\\n';
             batchResultsData.forEach(r => {
-                csv += keys.map(k => r[k]).join(',') + '\n';
+                csv += keys.map(k => r[k]).join(',') + '\\n';
             });
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
