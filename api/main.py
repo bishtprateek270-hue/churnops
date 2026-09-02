@@ -852,7 +852,7 @@ def root():
                     </div>
 
                     <div style="margin-bottom: 1.25rem;">
-                        <button class="btn-primary" onclick="trainModel()"><span id="trainSpinner">&#9889;</span> Train Leak-Free Model Suite</button>
+                        <button class="btn-primary" id="trainBtn" onclick="trainModel()"><span id="trainSpinner">&#9889;</span> Train Leak-Free Model Suite</button>
                     </div>
 
                     <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">Dataset Preview (First 10 Rows)</h3>
@@ -887,7 +887,7 @@ def root():
                 </div>
 
                 <div style="margin-bottom: 1rem;">
-                    <button class="btn-primary" onclick="predictRow()"><span id="predictRowSpinner">&#9889;</span> Predict Selected Row</button>
+                    <button class="btn-primary" id="predictRowBtn" onclick="predictRow()"><span id="predictRowSpinner">&#9889;</span> Predict Selected Row</button>
                 </div>
 
                 <div id="rowOutputContainer" style="display: none;">
@@ -1142,9 +1142,12 @@ def root():
         }
 
         async function trainModel() {
+            const btn = document.getElementById('trainBtn');
             const target_col = document.getElementById('targetSelect').value;
+            if (btn) btn.disabled = true;
             document.getElementById('trainSpinner').innerText = '...';
-            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">&#8987; Training model suite... Please wait...</div>';
+            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">&#8987; Training model suite across 5 algorithms... Please wait ~25s...</div>';
+            document.getElementById('uploadStatus').scrollIntoView({ behavior: 'smooth', block: 'center' });
 
             try {
                 const res = await fetch('/dataset/train', {
@@ -1154,6 +1157,7 @@ def root():
                 });
 
                 const data = await res.json();
+                if (btn) btn.disabled = false;
                 document.getElementById('trainSpinner').innerText = 'Train';
 
                 if (res.ok && data.status === 'success') {
@@ -1163,6 +1167,7 @@ def root():
                     document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Training failed: ' + (data.detail || 'Error') + '</div>';
                 }
             } catch (err) {
+                if (btn) btn.disabled = false;
                 document.getElementById('trainSpinner').innerText = 'Train';
                 document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Error during training: ' + err.message + '</div>';
             }
@@ -1180,10 +1185,12 @@ def root():
             for (const [k, v] of Object.entries(metrics)) {
                 let displayVal = v;
                 if (typeof v === 'number') {
-                    displayVal = (k.includes('accuracy') || k.includes('precision') || k.includes('recall')) ? (v * 100).toFixed(1) + '%' : v.toFixed(4);
+                    displayVal = (k.includes('accuracy') || k.includes('precision') || k.includes('recall') || k.includes('f1') || k.includes('roc_auc')) ? (v * 100).toFixed(1) + '%' : v.toFixed(4);
                 }
                 grid.innerHTML += '<div class="metric-tile"><div class="metric-name">' + k.replace(/_/g, ' ') + '</div><div class="metric-val">' + displayVal + '</div></div>';
             }
+
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function loadRowPreview() {
@@ -1202,6 +1209,8 @@ def root():
 
         async function predictRow() {
             if (!activeDataset || !activeDataset.preview) return;
+            const btn = document.getElementById('predictRowBtn');
+            if (btn) btn.disabled = true;
             const idx = parseInt(document.getElementById('rowIndexInput').value) || 0;
             const rowData = activeDataset.preview[idx % activeDataset.preview.length] || {};
 
@@ -1215,6 +1224,7 @@ def root():
                 });
 
                 const data = await res.json();
+                if (btn) btn.disabled = false;
                 document.getElementById('predictRowSpinner').innerText = 'Predict';
 
                 if (res.ok) {
@@ -1222,13 +1232,16 @@ def root():
                     const actualVal = rowData[activeDataset.target_col] !== undefined ? rowData[activeDataset.target_col] : 'Unknown';
 
                     grid.innerHTML = `
-                        <div class="metric-tile"><div class="metric-name">Predicted Outcome</div><div class="metric-val">${data.churn_label}</div></div>
+                        <div class="metric-tile"><div class="metric-name">Predicted Outcome</div><div class="metric-val" style="color: #4f46e5;">${data.churn_label}</div></div>
                         <div class="metric-tile"><div class="metric-name">Confidence Probability</div><div class="metric-val">${(data.churn_probability * 100).toFixed(1)}%</div></div>
                         <div class="metric-tile"><div class="metric-name">Actual Label</div><div class="metric-val">${actualVal}</div></div>
                         <div class="metric-tile"><div class="metric-name">Inference Latency</div><div class="metric-val">${data.processing_time_ms} ms</div></div>
                     `;
+                    document.getElementById('rowOutputContainer').style.display = 'block';
+                    document.getElementById('rowOutputContainer').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
             } catch(e) {
+                if (btn) btn.disabled = false;
                 document.getElementById('predictRowSpinner').innerText = 'Predict';
             }
         }
