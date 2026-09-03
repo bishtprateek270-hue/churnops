@@ -163,52 +163,54 @@ def log_prediction_to_db(
 
 
 def load_model_and_preprocessor():
-    """Load model from MLflow Registry ('Production' or 'Staging') or fallback local file."""
+    """Load model from local artifact file or MLflow Registry ('Production' or 'Staging')."""
     start_time = time.time()
 
-    # 1. Load preprocessor
-    try:
-        model_store["preprocessor"] = load_preprocessor(settings.PREPROCESSOR_PATH)
-        logger.info("Successfully loaded preprocessor artifact.")
-    except Exception as e:
-        logger.warning(f"Could not load preprocessor from disk: {e}")
-
-    # 2. Load model from MLflow Registry
-    mlflow.set_tracking_uri(MLFLOW_URI)
-    client = mlflow.tracking.MlflowClient()
-
-    import warnings
-
-    for stage in ["Production", "Staging"]:
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", category=FutureWarning)
-                warnings.simplefilter("ignore", category=UserWarning)
-                versions = client.get_latest_versions(MODEL_NAME, stages=[stage])  # type: ignore
-            if versions:
-                version = versions[0].version
-                model_uri = f"models:/{MODEL_NAME}/{stage}"
-                logger.info(f"Loading MLflow model '{MODEL_NAME}' stage '{stage}' version {version}...")
-                model_store["model"] = mlflow.pyfunc.load_model(model_uri)
-                model_store["version"] = version
-                model_store["stage"] = stage
-                model_store["loaded_at"] = datetime.now(timezone.utc).isoformat()
-                logger.info(f"Model loaded successfully in {time.time() - start_time:.2f}s")
-                return
-        except Exception as e:
-            logger.warning(f"Could not load model from MLflow stage '{stage}': {e}")
-
-    # Fallback to local joblib file
+    # 1. Prioritize local joblib artifact for instant loading and zero memory overhead
     fallback_path = settings.BEST_MODEL_PATH
     if os.path.exists(fallback_path):
-        logger.info(f"Loading fallback model from local file {fallback_path}...")
-        model_store["model"] = joblib.load(fallback_path)
-        model_store["version"] = "local-1.0"
-        model_store["stage"] = "LocalFallback"
-        model_store["loaded_at"] = datetime.now(timezone.utc).isoformat()
-    else:
-        logger.info("No pre-trained model found. Initializing instant baseline model...")
-        create_instant_baseline_model()
+        try:
+            logger.info(f"Loading model from local file {fallback_path}...")
+            model_store["model"] = joblib.load(fallback_path)
+            model_store["version"] = "local-1.0"
+            model_store["stage"] = "LocalPipeline"
+            model_store["loaded_at"] = datetime.now(timezone.utc).isoformat()
+            if os.path.exists(settings.PREPROCESSOR_PATH):
+                model_store["preprocessor"] = load_preprocessor(settings.PREPROCESSOR_PATH)
+            logger.info(f"Model loaded successfully from disk in {time.time() - start_time:.2f}s")
+            return
+        except Exception as exc:
+            logger.warning(f"Could not load local joblib model: {exc}")
+
+    # 2. Fallback to MLflow Registry
+    try:
+        mlflow.set_tracking_uri(MLFLOW_URI)
+        client = mlflow.tracking.MlflowClient()
+        import warnings
+
+        for stage in ["Production", "Staging"]:
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=FutureWarning)
+                    warnings.simplefilter("ignore", category=UserWarning)
+                    versions = client.get_latest_versions(MODEL_NAME, stages=[stage])  # type: ignore
+                if versions:
+                    version = versions[0].version
+                    model_uri = f"models:/{MODEL_NAME}/{stage}"
+                    logger.info(f"Loading MLflow model '{MODEL_NAME}' stage '{stage}' version {version}...")
+                    model_store["model"] = mlflow.pyfunc.load_model(model_uri)
+                    model_store["version"] = version
+                    model_store["stage"] = stage
+                    model_store["loaded_at"] = datetime.now(timezone.utc).isoformat()
+                    logger.info(f"Model loaded successfully in {time.time() - start_time:.2f}s")
+                    return
+            except Exception as e:
+                logger.warning(f"Could not load model from MLflow stage '{stage}': {e}")
+    except Exception as exc:
+        logger.warning(f"MLflow client unavailable: {exc}")
+
+    logger.info("No pre-trained model found. Initializing instant baseline model...")
+    create_instant_baseline_model()
 
 
 def create_instant_baseline_model():
