@@ -132,7 +132,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trigger Render Deployment
-        if: env.RENDER_DEPLOY_HOOK_URL != ''
+        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |

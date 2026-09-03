@@ -352,14 +352,14 @@ def compare_and_promote(promote: bool = True) -> tuple[bool, dict]:
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=FutureWarning)
-        staging_versions = client.get_latest_versions(model_name, stages=["Staging"])
+        staging_versions = client.get_latest_versions(model_name, stages=["Staging"])  # type: ignore
     if not staging_versions:
         return False, {"error": "No Staging model found."}
 
     candidate_version = staging_versions[0].version
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=FutureWarning)
-        prod_versions = client.get_latest_versions(model_name, stages=["Production"])
+        prod_versions = client.get_latest_versions(model_name, stages=["Production"])  # type: ignore
     prod_version = prod_versions[0].version if prod_versions else None
 
     # Fetch candidate metrics dynamically from MLflow run
@@ -389,7 +389,7 @@ def compare_and_promote(promote: bool = True) -> tuple[bool, dict]:
     if promote and should_promote:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=FutureWarning)
-            client.transition_model_version_stage(
+            client.transition_model_version_stage(  # type: ignore
                 name=model_name, version=candidate_version, stage="Production", archive_existing_versions=True
             )
         promoted = True
