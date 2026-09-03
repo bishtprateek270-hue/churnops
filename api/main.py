@@ -184,7 +184,7 @@ def load_model_and_preprocessor():
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", category=FutureWarning)
                 warnings.simplefilter("ignore", category=UserWarning)
-                versions = client.get_latest_versions(MODEL_NAME, stages=[stage])
+                versions = client.get_latest_versions(MODEL_NAME, stages=[stage])  # type: ignore
             if versions:
                 version = versions[0].version
                 model_uri = f"models:/{MODEL_NAME}/{stage}"
