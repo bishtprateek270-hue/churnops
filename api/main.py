@@ -26,7 +26,7 @@ import joblib
 import mlflow
 import mlflow.pyfunc
 import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import APIKeyHeader
@@ -327,18 +327,12 @@ if ENABLE_CORS:
 
 
 @app.post("/dataset/upload")
-async def upload_dataset_api(file: Request):
+async def upload_dataset_api(file: UploadFile = File(...)):  # noqa: B008
     """Upload any CSV dataset, validate structure, and return column options and preview."""
     try:
-        form = await file.form()
-        uploaded_file = form.get("file")
-        from fastapi import UploadFile
-
-        if not isinstance(uploaded_file, UploadFile):
-            raise HTTPException(status_code=400, detail="No CSV file uploaded.")
-
-        contents = await uploaded_file.read()
+        contents = await file.read()
         import io
+
         df = pd.read_csv(io.BytesIO(contents))
 
         os.makedirs("data/raw", exist_ok=True)
@@ -354,7 +348,7 @@ async def upload_dataset_api(file: Request):
 
         return {
             "status": "success",
-            "filename": uploaded_file.filename or "uploaded.csv",
+            "filename": file.filename or "uploaded.csv",
             "rows": len(df),
             "columns": list(df.columns),
             "num_columns": len(df.columns),
