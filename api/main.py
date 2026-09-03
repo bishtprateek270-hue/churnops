@@ -1481,7 +1481,7 @@ async def predict_churn(payload: ChurnInput, request: Request):
             preds = model.predict(X_trans)
             pred_val = float(preds[0]) if hasattr(preds, "__len__") else float(preds)
             prob = 1.0
-            pred_class = int(round(pred_val))
+            pred_class = round(pred_val)
             label = f"{pred_val:.2f}"
     except Exception as e:
         logger.error(f"Inference error for request {request_id}: {e}")
@@ -1559,7 +1559,7 @@ async def predict_churn_batch(payload: BatchChurnInput, request: Request):
                 preds = model.predict(X_trans)
                 pred_val = float(preds[0]) if hasattr(preds, "__len__") else float(preds)
                 prob = 1.0
-                pred_class = int(round(pred_val))
+                pred_class = round(pred_val)
                 label = f"{pred_val:.2f}"
             results.append(
                 {
