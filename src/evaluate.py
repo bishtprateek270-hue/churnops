@@ -80,10 +80,10 @@ def calculate_classification_metrics(
 
 def calculate_regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     """Compute comprehensive regression metrics (MAE, RMSE, R2)."""
-    mae = mean_absolute_error(y_true, y_pred)
-    mse = mean_squared_error(y_true, y_pred)
-    rmse = np.sqrt(mse)
-    r2 = r2_score(y_true, y_pred)
+    mae = float(np.asarray(mean_absolute_error(y_true, y_pred)).item())
+    mse = float(np.asarray(mean_squared_error(y_true, y_pred)).item())
+    rmse = float(np.sqrt(mse))
+    r2 = float(np.asarray(r2_score(y_true, y_pred)).item())
 
     return {
         "mae": mae,
@@ -345,12 +345,18 @@ def compare_and_promote(promote: bool = True) -> tuple[bool, dict]:
     client = mlflow.tracking.MlflowClient()
     model_name = "ChurnOps-Model"
 
-    staging_versions = client.get_latest_versions(model_name, stages=["Staging"])
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=FutureWarning)
+        staging_versions = client.get_latest_versions(model_name, stages=["Staging"])
     if not staging_versions:
         return False, {"error": "No Staging model found."}
 
     candidate_version = staging_versions[0].version
-    prod_versions = client.get_latest_versions(model_name, stages=["Production"])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=FutureWarning)
+        prod_versions = client.get_latest_versions(model_name, stages=["Production"])
     prod_version = prod_versions[0].version if prod_versions else None
 
     # Fetch candidate metrics dynamically from MLflow run
@@ -378,9 +384,11 @@ def compare_and_promote(promote: bool = True) -> tuple[bool, dict]:
     promoted = False
 
     if promote and should_promote:
-        client.transition_model_version_stage(
-            name=model_name, version=candidate_version, stage="Production", archive_existing_versions=True
-        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=FutureWarning)
+            client.transition_model_version_stage(
+                name=model_name, version=candidate_version, stage="Production", archive_existing_versions=True
+            )
         promoted = True
 
     report = {

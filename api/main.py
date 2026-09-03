@@ -176,9 +176,14 @@ def load_model_and_preprocessor():
     mlflow.set_tracking_uri(MLFLOW_URI)
     client = mlflow.tracking.MlflowClient()
 
+    import warnings
+
     for stage in ["Production", "Staging"]:
         try:
-            versions = client.get_latest_versions(MODEL_NAME, stages=[stage])
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=FutureWarning)
+                warnings.simplefilter("ignore", category=UserWarning)
+                versions = client.get_latest_versions(MODEL_NAME, stages=[stage])
             if versions:
                 version = versions[0].version
                 model_uri = f"models:/{MODEL_NAME}/{stage}"
@@ -304,7 +309,9 @@ async def upload_dataset_api(file: Request):
     try:
         form = await file.form()
         uploaded_file = form.get("file")
-        if not uploaded_file:
+        from fastapi import UploadFile
+
+        if not isinstance(uploaded_file, UploadFile):
             raise HTTPException(status_code=400, detail="No CSV file uploaded.")
 
         contents = await uploaded_file.read()
@@ -324,7 +331,7 @@ async def upload_dataset_api(file: Request):
 
         return {
             "status": "success",
-            "filename": uploaded_file.filename,
+            "filename": uploaded_file.filename or "uploaded.csv",
             "rows": len(df),
             "columns": list(df.columns),
             "num_columns": len(df.columns),
@@ -1153,7 +1160,7 @@ def root():
             const target_col = document.getElementById('targetSelect').value;
             if (btn) btn.disabled = true;
             document.getElementById('trainSpinner').innerText = '...';
-            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">&#8987; Training model suite across 5 algorithms... Please wait ~25s...</div>';
+            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">&#8987; Training model suite across 5 algorithms... Please wait ~10s...</div>';
             document.getElementById('uploadStatus').scrollIntoView({ behavior: 'smooth', block: 'center' });
 
             try {
@@ -1163,7 +1170,14 @@ def root():
                     body: JSON.stringify({ target_col: target_col, fast_mode: true })
                 });
 
-                const data = await res.json();
+                let data;
+                try {
+                    data = await res.json();
+                } catch (e) {
+                    const rawText = await res.text().catch(() => '');
+                    data = { detail: 'Server response parsing failed (HTTP ' + res.status + ' ' + (res.statusText || 'Error') + '). ' + (rawText ? rawText.substring(0, 100) : '') };
+                }
+
                 if (btn) btn.disabled = false;
                 document.getElementById('trainSpinner').innerText = 'Train';
 
@@ -1171,7 +1185,7 @@ def root():
                     document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-success">&#127881; Training complete! Best Model: <strong>' + data.result.best_model_name + '</strong> in ' + data.result.total_time_seconds + 's</div>';
                     renderResults(data.result);
                 } else {
-                    document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Training failed: ' + (data.detail || 'Error') + '</div>';
+                    document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Training failed: ' + (data.detail || 'Server Error') + '</div>';
                 }
             } catch (err) {
                 if (btn) btn.disabled = false;

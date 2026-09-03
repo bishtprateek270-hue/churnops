@@ -62,9 +62,24 @@ MODEL_NAME = settings.MODEL_NAME
 
 
 def setup_mlflow():
-    mlflow.set_tracking_uri(MLFLOW_URI)
-    mlflow.set_experiment(EXPERIMENT_NAME)
-    print(f"MLflow tracking initialized at {MLFLOW_URI}")
+    try:
+        if os.path.exists("mlruns"):
+            for item in os.listdir("mlruns"):
+                item_path = os.path.join("mlruns", item)
+                if os.path.isdir(item_path) and item != ".trash":
+                    meta_file = os.path.join(item_path, "meta.yaml")
+                    if not os.path.exists(meta_file):
+                        import shutil
+                        try:
+                            shutil.rmtree(item_path)
+                            print(f"Notice: Cleaned up corrupted MLflow directory: {item_path}")
+                        except Exception:
+                            pass
+        mlflow.set_tracking_uri(MLFLOW_URI)
+        mlflow.set_experiment(EXPERIMENT_NAME)
+        print(f"MLflow tracking initialized at {MLFLOW_URI}")
+    except Exception as exc:
+        print(f"Notice: MLflow setup note: {exc}")
 
 
 def run_optuna_tuning(
@@ -264,6 +279,8 @@ def train_and_evaluate(
     id_cols = detect_identifier_columns(df_clean, target_col=actual_target)
     y_raw = df_clean[actual_target]
 
+    eval_threshold = 0.5
+
     if task_type == "classification":
         if y_raw.dtype == object or str(y_raw.dtype) in ["string", "category", "bool"]:
             str_vals = y_raw.astype(str).str.strip().str.lower()
@@ -278,12 +295,12 @@ def train_and_evaluate(
                 labels, _ = pd.factorize(y_raw)
                 y = np.where(labels < 0, 0, labels)
         else:
-            num_vals = pd.to_numeric(y_raw, errors="coerce").fillna(0.0)
-            unique_nums = set(np.unique(num_vals.values))
+            num_arr = np.asarray(pd.to_numeric(y_raw, errors="coerce").fillna(0.0).values, dtype=np.float64)
+            unique_nums = set(np.unique(num_arr).tolist())
             if unique_nums.issubset({0, 1}):
-                y = np.where(num_vals.values > 0.5, 1, 0)
+                y = np.where(num_arr > 0.5, 1, 0)
             else:
-                y = np.where(num_vals.values > np.median(num_vals.values), 1, 0)
+                y = np.where(num_arr > float(np.median(num_arr)), 1, 0)
         y = np.asarray(y, dtype=np.int64)
 
         pos_count = int(np.sum(y == 1))
@@ -330,13 +347,14 @@ def train_and_evaluate(
     )
 
     # 4. Fit Preprocessor STRICTLY on X_train_raw
-    X_train, _, preprocessor, feature_names = prepare_data(X_train_raw, fit=True, target_col=None)
-    X_val, _, _, _ = prepare_data(X_val_raw, preprocessor=preprocessor, fit=False)
-    X_test, _, _, _ = prepare_data(X_test_raw, preprocessor=preprocessor, fit=False)
+    X_train, _, preprocessor_obj, feature_names = prepare_data(X_train_raw, fit=True, target_col=None)
+    X_val, _, _, _ = prepare_data(X_val_raw, preprocessor=preprocessor_obj, fit=False) # type: ignore
+    X_test, _, _, _ = prepare_data(X_test_raw, preprocessor=preprocessor_obj, fit=False) # type: ignore
 
-    preprocessor.target_col_ = actual_target
-    preprocessor.id_cols_ = id_cols
-    preprocessor.task_type_ = task_type
+    preprocessor = preprocessor_obj
+    setattr(preprocessor, "target_col_", actual_target)
+    setattr(preprocessor, "id_cols_", id_cols)
+    setattr(preprocessor, "task_type_", task_type)
     save_preprocessor(preprocessor, "models/preprocessor.joblib")
 
     t_prep = time.perf_counter() - t0
@@ -387,21 +405,22 @@ def train_and_evaluate(
                         c_val = float(best_params["C"]) if "C" in best_params else 1.0
                         base_clf = LogisticRegression(C=c_val, max_iter=1000, class_weight="balanced", random_state=42)
                     elif name == "Random_Forest":
-                        n_est = int(best_params.get("n_estimators", 100))
-                        max_d = int(best_params.get("max_depth", 8))
-                        base_clf = RandomForestClassifier(n_estimators=n_est, max_depth=max_d, class_weight="balanced", n_jobs=-1, random_state=42)
+                        n_est = int(best_params.get("n_estimators", 50 if fast_mode else 100))
+                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 8))
+                        base_clf = RandomForestClassifier(n_estimators=n_est, max_depth=max_d, class_weight="balanced", n_jobs=2, random_state=42)
                     elif name == "HistGradientBoosting":
                         lr = float(best_params.get("learning_rate", 0.1))
-                        max_d = int(best_params.get("max_depth", 6))
-                        base_clf = HistGradientBoostingClassifier(learning_rate=lr, max_depth=max_d, random_state=42)
+                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 6))
+                        max_i = 50 if fast_mode else 100
+                        base_clf = HistGradientBoostingClassifier(learning_rate=lr, max_depth=max_d, max_iter=max_i, random_state=42)
                     elif name == "XGBoost":
-                        n_est = int(best_params.get("n_estimators", 100))
-                        max_d = int(best_params.get("max_depth", 6))
+                        n_est = int(best_params.get("n_estimators", 50 if fast_mode else 100))
+                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 6))
                         lr = float(best_params.get("learning_rate", 0.1))
-                        base_clf = XGBClassifier(n_estimators=n_est, max_depth=max_d, learning_rate=lr, eval_metric="logloss", n_jobs=-1, random_state=42)
+                        base_clf = XGBClassifier(n_estimators=n_est, max_depth=max_d, learning_rate=lr, eval_metric="logloss", n_jobs=2, random_state=42)
                     elif name == "CatBoost":
-                        iters = int(best_params.get("iterations", 100))
-                        depth = int(best_params.get("depth", 6))
+                        iters = int(best_params.get("iterations", 50 if fast_mode else 100))
+                        depth = int(best_params.get("depth", 5 if fast_mode else 6))
                         lr = float(best_params.get("learning_rate", 0.1))
                         base_clf = CatBoostClassifier(iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=2)
                     else:
@@ -448,23 +467,24 @@ def train_and_evaluate(
                         alpha_val = float(best_params.get("alpha", 1.0))
                         reg = Ridge(alpha=alpha_val, random_state=42)
                     elif name == "Random_Forest":
-                        n_est = int(best_params.get("n_estimators", 100))
-                        max_d = int(best_params.get("max_depth", 8))
-                        reg = RandomForestRegressor(n_estimators=n_est, max_depth=max_d, n_jobs=-1, random_state=42)
+                        n_est = int(best_params.get("n_estimators", 50 if fast_mode else 100))
+                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 8))
+                        reg = RandomForestRegressor(n_estimators=n_est, max_depth=max_d, n_jobs=2, random_state=42)
                     elif name == "HistGradientBoosting":
                         lr = float(best_params.get("learning_rate", 0.1))
-                        max_d = int(best_params.get("max_depth", 6))
-                        reg = HistGradientBoostingRegressor(learning_rate=lr, max_depth=max_d, random_state=42)
+                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 6))
+                        max_i = 50 if fast_mode else 100
+                        reg = HistGradientBoostingRegressor(learning_rate=lr, max_depth=max_d, max_iter=max_i, random_state=42)
                     elif name == "XGBoost":
-                        n_est = int(best_params.get("n_estimators", 100))
-                        max_d = int(best_params.get("max_depth", 6))
+                        n_est = int(best_params.get("n_estimators", 50 if fast_mode else 100))
+                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 6))
                         lr = float(best_params.get("learning_rate", 0.1))
-                        reg = XGBRegressor(n_estimators=n_est, max_depth=max_d, learning_rate=lr, n_jobs=-1, random_state=42)
+                        reg = XGBRegressor(n_estimators=n_est, max_depth=max_d, learning_rate=lr, n_jobs=2, random_state=42)
                     elif name == "CatBoost":
-                        iters = int(best_params.get("iterations", 100))
-                        depth = int(best_params.get("depth", 6))
+                        iters = int(best_params.get("iterations", 50 if fast_mode else 100))
+                        depth = int(best_params.get("depth", 5 if fast_mode else 6))
                         lr = float(best_params.get("learning_rate", 0.1))
-                        reg = CatBoostRegressor(iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=-1)
+                        reg = CatBoostRegressor(iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=2)
                     else:
                         reg = Ridge(random_state=42)
 
@@ -488,8 +508,6 @@ def train_and_evaluate(
             model_res = {"model_name": name, "business_cost": min_cost}
             model_res.update(val_metrics)
             model_results.append(model_res)
-
-            mlflow.sklearn.log_model(final_model_obj, artifact_path="model", serialization_format="cloudpickle")
 
             is_better = (cv_score > best_cv_score) if task_type == "classification" else (cv_score < best_cv_score)
             if is_better or best_model_obj is None:
@@ -522,16 +540,18 @@ def train_and_evaluate(
         y_test_pred = (
             np.where(y_test_prob >= best_threshold, 1, 0) if y_test_prob is not None else best_model_obj.predict(X_test)
         )
-        best_test_metrics = calculate_all_metrics(y_test, y_test_pred, y_test_prob, task_type="classification")
+        y_test_pred_arr = np.asarray(y_test_pred)
+        best_test_metrics = calculate_all_metrics(y_test, y_test_pred_arr, y_test_prob, task_type="classification")
         _, best_business_cost, _ = (
             optimize_business_threshold(y_test, y_test_prob, cost_fn=500.0, cost_fp=50.0)
             if y_test_prob is not None
             else (0.5, 0.0, {})
         )
 
-        log_classification_plots(y_test, y_test_pred, y_test_prob, best_model_name)
+        model_title = best_model_name or "Best_Model"
+        log_classification_plots(y_test, y_test_pred_arr, y_test_prob, model_title)
         if y_test_prob is not None:
-            plot_calibration_curve_to_file(y_test, y_test_prob, best_model_name)
+            plot_calibration_curve_to_file(y_test, y_test_prob, model_title)
 
         roc_auc_val = best_test_metrics.get("roc_auc", 0.5)
         acc_val = best_test_metrics.get("accuracy", 0.0)
@@ -548,8 +568,8 @@ def train_and_evaluate(
             warnings_list.append(warn_msg)
 
     else:
-        y_test_pred = best_model_obj.predict(X_test)
-        best_test_metrics = calculate_all_metrics(y_test, y_test_pred, task_type="regression")
+        y_test_pred_arr = np.asarray(best_model_obj.predict(X_test))
+        best_test_metrics = calculate_all_metrics(y_test, y_test_pred_arr, task_type="regression")
         best_business_cost = 0.0
 
         if best_test_metrics.get("r2_score", 0.0) < 0.0:
@@ -568,15 +588,21 @@ def train_and_evaluate(
 
     print(f"\nBest Model Selected: {best_model_name} (CV Score: {best_cv_score:.4f}, Run ID: {best_run_id})")
 
-    # Register best model in MLflow Model Registry
+    # Log winning model artifact and register in MLflow Model Registry
     registered_version = "local-1"
     try:
+        import warnings
+        if best_run_id:
+            with mlflow.start_run(run_id=best_run_id):
+                mlflow.sklearn.log_model(best_model_obj, artifact_path="model", serialization_format="cloudpickle")
         model_uri = f"runs:/{best_run_id}/model"
         registered_model = mlflow.register_model(model_uri, MODEL_NAME)
         client = mlflow.tracking.MlflowClient()
-        client.transition_model_version_stage(
-            name=MODEL_NAME, version=registered_model.version, stage="Staging", archive_existing_versions=False
-        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=FutureWarning)
+            client.transition_model_version_stage(
+                name=MODEL_NAME, version=registered_model.version, stage="Staging", archive_existing_versions=False
+            )
         registered_version = registered_model.version
     except Exception as exc:
         print(f"Notice: MLflow registry registration note: {exc}")
@@ -621,7 +647,7 @@ def train_and_evaluate(
         "best_val_metrics": best_val_metrics,
         "best_test_metrics": best_test_metrics,
         "best_f1": primary_score,
-        "business_cost": float(best_business_cost),
+        "business_cost": best_business_cost,
         "model_results": model_results,
         "warnings": warnings_list,
         "best_run_id": best_run_id,
