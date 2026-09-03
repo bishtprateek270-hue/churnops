@@ -452,7 +452,8 @@ def train_and_evaluate(
                         if y_val_prob is not None
                         else final_model_obj.predict(X_val)
                     )
-                    val_metrics = calculate_all_metrics(y_val, y_val_pred, y_val_prob, task_type="classification")
+                    y_val_pred_arr = np.asarray(y_val_pred)
+                    val_metrics = calculate_all_metrics(y_val, y_val_pred_arr, y_val_prob, task_type="classification")
 
                     cv_score = val_metrics["roc_auc"]
                     min_cost = val_cost
@@ -599,7 +600,7 @@ def train_and_evaluate(
         client = mlflow.tracking.MlflowClient()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=FutureWarning)
-            client.transition_model_version_stage(
+            client.transition_model_version_stage(  # type: ignore
                 name=MODEL_NAME, version=registered_model.version, stage="Staging", archive_existing_versions=False
             )
         registered_version = registered_model.version
@@ -635,7 +636,7 @@ def train_and_evaluate(
     if progress_callback:
         progress_callback(100, f"Step 5/5: Done in {t_total:.1f}s!")
 
-    primary_score = float(best_test_metrics.get("f1_score", best_test_metrics.get("r2_score", 0.0)))
+    primary_score = best_test_metrics.get("f1_score", best_test_metrics.get("r2_score", 0.0))
 
     return {
         "best_model_name": best_model_name,
