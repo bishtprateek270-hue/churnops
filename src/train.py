@@ -384,6 +384,14 @@ def train_and_evaluate(
     best_business_cost = 0.0
     model_results = []
 
+    # Sub-sample training set for candidate model selection in fast_mode to ensure ultra-fast execution
+    if fast_mode and len(X_train) > 2500:
+        np.random.seed(42)
+        sub_idx = np.random.choice(len(X_train), size=2500, replace=False)
+        X_train_fit, y_train_fit = X_train[sub_idx], y_train[sub_idx]
+    else:
+        X_train_fit, y_train_fit = X_train, y_train
+
     print(f"\n--- Model Suite CV Evaluation (Fast Mode: {fast_mode}) ---")
     for idx, name in enumerate(candidate_models):
         if progress_callback:
@@ -402,38 +410,38 @@ def train_and_evaluate(
                 try:
                     if name == "Logistic_Regression":
                         c_val = float(best_params["C"]) if "C" in best_params else 1.0
-                        base_clf = LogisticRegression(C=c_val, max_iter=1000, class_weight="balanced", random_state=42)
+                        base_clf = LogisticRegression(C=c_val, max_iter=300, class_weight="balanced", random_state=42)
                     elif name == "Random_Forest":
-                        n_est = int(best_params.get("n_estimators", 50 if fast_mode else 100))
-                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 8))
-                        base_clf = RandomForestClassifier(n_estimators=n_est, max_depth=max_d, class_weight="balanced", n_jobs=2, random_state=42)
+                        n_est = int(best_params.get("n_estimators", 20 if fast_mode else 100))
+                        max_d = int(best_params.get("max_depth", 4 if fast_mode else 8))
+                        base_clf = RandomForestClassifier(n_estimators=n_est, max_depth=max_d, class_weight="balanced", n_jobs=-1, random_state=42)
                     elif name == "HistGradientBoosting":
                         lr = float(best_params.get("learning_rate", 0.1))
-                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 6))
-                        max_i = 50 if fast_mode else 100
+                        max_d = int(best_params.get("max_depth", 4 if fast_mode else 6))
+                        max_i = 25 if fast_mode else 100
                         base_clf = HistGradientBoostingClassifier(learning_rate=lr, max_depth=max_d, max_iter=max_i, random_state=42)
                     elif name == "XGBoost":
-                        n_est = int(best_params.get("n_estimators", 50 if fast_mode else 100))
-                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 6))
+                        n_est = int(best_params.get("n_estimators", 20 if fast_mode else 100))
+                        max_d = int(best_params.get("max_depth", 4 if fast_mode else 6))
                         lr = float(best_params.get("learning_rate", 0.1))
-                        base_clf = XGBClassifier(n_estimators=n_est, max_depth=max_d, learning_rate=lr, eval_metric="logloss", n_jobs=2, random_state=42)
+                        base_clf = XGBClassifier(n_estimators=n_est, max_depth=max_d, learning_rate=lr, eval_metric="logloss", n_jobs=-1, random_state=42)
                     elif name == "CatBoost":
-                        iters = int(best_params.get("iterations", 50 if fast_mode else 100))
-                        depth = int(best_params.get("depth", 5 if fast_mode else 6))
+                        iters = int(best_params.get("iterations", 25 if fast_mode else 100))
+                        depth = int(best_params.get("depth", 4 if fast_mode else 6))
                         lr = float(best_params.get("learning_rate", 0.1))
-                        base_clf = CatBoostClassifier(iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=2)
+                        base_clf = CatBoostClassifier(iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=-1)
                     else:
-                        base_clf = LogisticRegression(max_iter=1000, random_state=42)
+                        base_clf = LogisticRegression(max_iter=300, random_state=42)
 
-                    pos_ratio = float(np.mean(y_train == 1)) if len(y_train) > 0 else 0.5
+                    pos_ratio = float(np.mean(y_train_fit == 1)) if len(y_train_fit) > 0 else 0.5
                     is_imbalanced = pos_ratio < 0.35 or pos_ratio > 0.65
-                    use_smote = is_imbalanced and len(y_train) >= 20 and np.min(np.bincount(y_train)) >= 2
+                    use_smote = is_imbalanced and len(y_train_fit) >= 20 and np.min(np.bincount(y_train_fit)) >= 2
                     if use_smote and name not in ["HistGradientBoosting"]:
                         model_pipeline = ImbPipeline([("smote", SMOTE(random_state=42)), ("classifier", base_clf)])
                     else:
                         model_pipeline = Pipeline([("classifier", base_clf)])
 
-                    model_pipeline.fit(X_train, y_train)
+                    model_pipeline.fit(X_train_fit, y_train_fit)
                     final_model_obj = model_pipeline
 
                     if hasattr(final_model_obj, "predict_proba"):
@@ -467,28 +475,28 @@ def train_and_evaluate(
                         alpha_val = float(best_params.get("alpha", 1.0))
                         reg = Ridge(alpha=alpha_val, random_state=42)
                     elif name == "Random_Forest":
-                        n_est = int(best_params.get("n_estimators", 50 if fast_mode else 100))
-                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 8))
-                        reg = RandomForestRegressor(n_estimators=n_est, max_depth=max_d, n_jobs=2, random_state=42)
+                        n_est = int(best_params.get("n_estimators", 20 if fast_mode else 100))
+                        max_d = int(best_params.get("max_depth", 4 if fast_mode else 8))
+                        reg = RandomForestRegressor(n_estimators=n_est, max_depth=max_d, n_jobs=-1, random_state=42)
                     elif name == "HistGradientBoosting":
                         lr = float(best_params.get("learning_rate", 0.1))
-                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 6))
-                        max_i = 50 if fast_mode else 100
+                        max_d = int(best_params.get("max_depth", 4 if fast_mode else 6))
+                        max_i = 25 if fast_mode else 100
                         reg = HistGradientBoostingRegressor(learning_rate=lr, max_depth=max_d, max_iter=max_i, random_state=42)
                     elif name == "XGBoost":
-                        n_est = int(best_params.get("n_estimators", 50 if fast_mode else 100))
-                        max_d = int(best_params.get("max_depth", 5 if fast_mode else 6))
+                        n_est = int(best_params.get("n_estimators", 20 if fast_mode else 100))
+                        max_d = int(best_params.get("max_depth", 4 if fast_mode else 6))
                         lr = float(best_params.get("learning_rate", 0.1))
-                        reg = XGBRegressor(n_estimators=n_est, max_depth=max_d, learning_rate=lr, n_jobs=2, random_state=42)
+                        reg = XGBRegressor(n_estimators=n_est, max_depth=max_d, learning_rate=lr, n_jobs=-1, random_state=42)
                     elif name == "CatBoost":
-                        iters = int(best_params.get("iterations", 50 if fast_mode else 100))
-                        depth = int(best_params.get("depth", 5 if fast_mode else 6))
+                        iters = int(best_params.get("iterations", 25 if fast_mode else 100))
+                        depth = int(best_params.get("depth", 4 if fast_mode else 6))
                         lr = float(best_params.get("learning_rate", 0.1))
-                        reg = CatBoostRegressor(iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=2)
+                        reg = CatBoostRegressor(iterations=iters, depth=depth, learning_rate=lr, verbose=0, random_seed=42, thread_count=-1)
                     else:
                         reg = Ridge(random_state=42)
 
-                    reg.fit(X_train, y_train)
+                    reg.fit(X_train_fit, y_train_fit)
                     y_val_pred = reg.predict(X_val)
                     val_metrics = calculate_all_metrics(y_val, y_val_pred, task_type="regression")
                     cv_score = val_metrics["rmse"]
@@ -524,6 +532,12 @@ def train_and_evaluate(
 
     if best_model_obj is None:
         raise RuntimeError(f"All candidate models failed during training. Results: {model_results}")
+
+    # Refit winning model on full training dataset
+    try:
+        best_model_obj.fit(X_train, y_train)
+    except Exception as exc:
+        print(f"Notice: Refitting winning model on full train set failed: {exc}")
 
     if progress_callback:
         progress_callback(75, "Step 3/5: Evaluating winning model ONCE on holdout test set...")
