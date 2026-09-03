@@ -347,14 +347,13 @@ def train_and_evaluate(
     )
 
     # 4. Fit Preprocessor STRICTLY on X_train_raw
-    X_train, _, preprocessor_obj, feature_names = prepare_data(X_train_raw, fit=True, target_col=None)
-    X_val, _, _, _ = prepare_data(X_val_raw, preprocessor=preprocessor_obj, fit=False) # type: ignore
-    X_test, _, _, _ = prepare_data(X_test_raw, preprocessor=preprocessor_obj, fit=False) # type: ignore
+    X_train, _, preprocessor, feature_names = prepare_data(X_train_raw, fit=True, target_col=None)
+    X_val, _, _, _ = prepare_data(X_val_raw, preprocessor=preprocessor, fit=False)  # type: ignore
+    X_test, _, _, _ = prepare_data(X_test_raw, preprocessor=preprocessor, fit=False)  # type: ignore
 
-    preprocessor = preprocessor_obj
-    setattr(preprocessor, "target_col_", actual_target)
-    setattr(preprocessor, "id_cols_", id_cols)
-    setattr(preprocessor, "task_type_", task_type)
+    preprocessor.target_col_ = actual_target  # type: ignore
+    preprocessor.id_cols_ = id_cols  # type: ignore
+    preprocessor.task_type_ = task_type  # type: ignore
     save_preprocessor(preprocessor, "models/preprocessor.joblib")
 
     t_prep = time.perf_counter() - t0
