@@ -34,7 +34,7 @@ from fastapi.security import APIKeyHeader
 from api.schemas import BatchChurnInput, BatchChurnOutput, ChurnInput, ChurnOutput, HealthResponse
 from src.config import settings
 from src.data_validation import DataValidationError, validate_data
-from src.preprocessing import find_target_col, is_identifier_column, load_preprocessor, prepare_data
+from src.preprocessing import find_target_col, infer_task_type, is_identifier_column, load_preprocessor, prepare_data
 
 # Configure structured logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -341,7 +341,8 @@ async def upload_dataset_api(file: UploadFile = File(...)):  # noqa: B008
         upload_path = "data/raw/user_upload.csv"
         df.to_csv(upload_path, index=False)
 
-        detected_target = find_target_col(df)
+        detected_target = find_target_col(df, allow_fallback=True)
+        task_type = infer_task_type(df[detected_target]) if (detected_target and detected_target in df.columns) else "classification"
         target_options = [c for c in df.columns if not is_identifier_column(df, c)]
         if not target_options:
             target_options = list(df.columns)
@@ -355,6 +356,7 @@ async def upload_dataset_api(file: UploadFile = File(...)):  # noqa: B008
             "columns": list(df.columns),
             "num_columns": len(df.columns),
             "detected_target": detected_target,
+            "task_type": task_type,
             "target_options": target_options,
             "preview": preview_records,
         }
@@ -1269,14 +1271,24 @@ def root():
 
                 if (res.ok) {
                     const grid = document.getElementById('rowResultMetrics');
-                    const actualVal = rowData[activeDataset.target_col] !== undefined ? rowData[activeDataset.target_col] : 'Unknown';
+                    const actualVal = (rowData && rowData[activeDataset.target_col] !== undefined) ? rowData[activeDataset.target_col] : 'Unknown';
+                    const isRegression = (activeDataset && activeDataset.task_type === 'regression');
 
-                    grid.innerHTML = `
-                        <div class="metric-tile"><div class="metric-name">Predicted Outcome</div><div class="metric-val" style="color: #4f46e5;">${data.churn_label}</div></div>
-                        <div class="metric-tile"><div class="metric-name">Confidence Probability</div><div class="metric-val">${(data.churn_probability * 100).toFixed(1)}%</div></div>
-                        <div class="metric-tile"><div class="metric-name">Actual Label</div><div class="metric-val">${actualVal}</div></div>
-                        <div class="metric-tile"><div class="metric-name">Inference Latency</div><div class="metric-val">${data.processing_time_ms} ms</div></div>
-                    `;
+                    if (isRegression) {
+                        grid.innerHTML = `
+                            <div class="metric-tile"><div class="metric-name">Predicted Value</div><div class="metric-val" style="color: #4f46e5;">${data.churn_label}</div></div>
+                            <div class="metric-tile"><div class="metric-name">Actual Target Value</div><div class="metric-val">${actualVal}</div></div>
+                            <div class="metric-tile"><div class="metric-name">Model Version</div><div class="metric-val">${data.model_version}</div></div>
+                            <div class="metric-tile"><div class="metric-name">Inference Latency</div><div class="metric-val">${data.processing_time_ms} ms</div></div>
+                        `;
+                    } else {
+                        grid.innerHTML = `
+                            <div class="metric-tile"><div class="metric-name">Predicted Label</div><div class="metric-val" style="color: #4f46e5;">${data.churn_label} (${data.churn_prediction})</div></div>
+                            <div class="metric-tile"><div class="metric-name">Confidence Probability</div><div class="metric-val">${(data.churn_probability * 100).toFixed(1)}%</div></div>
+                            <div class="metric-tile"><div class="metric-name">Actual Label</div><div class="metric-val">${actualVal}</div></div>
+                            <div class="metric-tile"><div class="metric-name">Inference Latency</div><div class="metric-val">${data.processing_time_ms} ms</div></div>
+                        `;
+                    }
                     document.getElementById('rowOutputContainer').style.display = 'block';
                     document.getElementById('rowOutputContainer').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
@@ -1452,22 +1464,30 @@ async def predict_churn(payload: ChurnInput, request: Request):
     # Predict
     try:
         model = model_store["model"]
-        # Check if predict method exists on model wrapper
-        if hasattr(model, "predict_proba"):
-            probs = model.predict_proba(X_trans)
-            prob = float(probs[0, 1])
-            pred_class = int(prob > 0.5)
+        preprocessor = model_store.get("preprocessor")
+        task_type = getattr(preprocessor, "task_type_", "classification")
+
+        if task_type == "classification":
+            if hasattr(model, "predict_proba"):
+                probs = model.predict_proba(X_trans)
+                prob = float(probs[0, 1]) if probs.ndim > 1 and probs.shape[1] > 1 else float(probs[0])
+                pred_class = int(prob > 0.5)
+            else:
+                preds = model.predict(X_trans)
+                pred_class = int(preds[0])
+                prob = float(pred_class)
+            label = "Yes" if pred_class == 1 else "No"
         else:
             preds = model.predict(X_trans)
-            prob = float(preds[0]) if preds.ndim == 1 else float(preds[0, 1])
-            pred_class = int(prob > 0.5)
+            pred_val = float(preds[0]) if hasattr(preds, "__len__") else float(preds)
+            prob = 1.0
+            pred_class = int(round(pred_val))
+            label = f"{pred_val:.2f}"
     except Exception as e:
         logger.error(f"Inference error for request {request_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Inference error: {str(e)}"
         ) from e
-
-    label = "Yes" if pred_class == 1 else "No"
     now_iso = datetime.now(timezone.utc).isoformat()
     processing_time_ms = (time.time() - start_time) * 1000
 
@@ -1522,16 +1542,25 @@ async def predict_churn_batch(payload: BatchChurnInput, request: Request):
 
             # Predict
             model = model_store["model"]
-            if hasattr(model, "predict_proba"):
-                probs = model.predict_proba(X_trans)
-                prob = float(probs[0, 1])
-                pred_class = int(prob > 0.5)
+            preprocessor = model_store.get("preprocessor")
+            task_type = getattr(preprocessor, "task_type_", "classification")
+
+            if task_type == "classification":
+                if hasattr(model, "predict_proba"):
+                    probs = model.predict_proba(X_trans)
+                    prob = float(probs[0, 1]) if probs.ndim > 1 and probs.shape[1] > 1 else float(probs[0])
+                    pred_class = int(prob > 0.5)
+                else:
+                    preds = model.predict(X_trans)
+                    pred_class = int(preds[0])
+                    prob = float(pred_class)
+                label = "Yes" if pred_class == 1 else "No"
             else:
                 preds = model.predict(X_trans)
-                prob = float(preds[0]) if preds.ndim == 1 else float(preds[0, 1])
-                pred_class = int(prob > 0.5)
-
-            label = "Yes" if pred_class == 1 else "No"
+                pred_val = float(preds[0]) if hasattr(preds, "__len__") else float(preds)
+                prob = 1.0
+                pred_class = int(round(pred_val))
+                label = f"{pred_val:.2f}"
             results.append(
                 {
                     "index": idx,
