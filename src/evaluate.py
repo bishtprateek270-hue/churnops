@@ -254,7 +254,7 @@ def plot_calibration_curve_to_file(
 def generate_shap_plots(
     model: object, X_sample: np.ndarray, feature_names: list[str], output_dir: str = "reports/plots"
 ) -> tuple[dict[str, str], str | None]:
-    """Generate SHAP summary plot and feature importance chart."""
+    """Generate SHAP summary plot and feature importance chart using memory-safe sampling."""
     os.makedirs(output_dir, exist_ok=True)
     shap_paths = {}
     shap_warning = None
@@ -267,17 +267,20 @@ def generate_shap_plots(
             print(f"Notice: Stale SHAP plot cleanup note: {exc}")
 
     try:
+        # Cap sample to 10 rows and background to 5 rows to prevent RAM OOM (Status 137) on 512MB containers
+        X_sub = X_sample[: min(10, len(X_sample))]
         predict_fn = getattr(model, "predict_proba", getattr(model, "predict", None))
         if predict_fn:
-            explainer = shap.Explainer(predict_fn, X_sample)
-            max_ev = min(100, 2 * X_sample.shape[1] + 1)
-            shap_values = explainer(X_sample, max_evals=max_ev)
+            background = shap.sample(X_sub, min(5, len(X_sub)))
+            explainer = shap.Explainer(predict_fn, background)
+            max_ev = 2 * X_sub.shape[1] + 1
+            shap_values = explainer(X_sub, max_evals=max_ev)
 
             plt.figure(figsize=(8, 6))
             if hasattr(shap_values, "values") and shap_values.values.ndim == 3:
-                shap.summary_plot(shap_values.values[:, :, 1], X_sample, feature_names=feature_names, show=False)
+                shap.summary_plot(shap_values.values[:, :, 1], X_sub, feature_names=feature_names, show=False)
             else:
-                shap.summary_plot(shap_values, X_sample, feature_names=feature_names, show=False)
+                shap.summary_plot(shap_values, X_sub, feature_names=feature_names, show=False)
 
             plt.tight_layout()
             plt.savefig(summary_path)
