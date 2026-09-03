@@ -15,6 +15,7 @@ from typing import Any
 import httpx
 
 os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
+os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 
 # Ensure workspace root directory is on sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -206,20 +207,42 @@ def load_model_and_preprocessor():
         model_store["stage"] = "LocalFallback"
         model_store["loaded_at"] = datetime.now(timezone.utc).isoformat()
     else:
-        logger.info("No pre-trained model found. Initializing initial baseline model...")
-        try:
-            from src.train import train_and_evaluate
+        logger.info("No pre-trained model found. Initializing instant baseline model...")
+        create_instant_baseline_model()
 
-            train_and_evaluate(fast_mode=True)
-            if os.path.exists(fallback_path):
-                model_store["model"] = joblib.load(fallback_path)
-                model_store["preprocessor"] = load_preprocessor(settings.PREPROCESSOR_PATH)
-                model_store["version"] = "local-auto-1.0"
-                model_store["stage"] = "AutoTrained"
-                model_store["loaded_at"] = datetime.now(timezone.utc).isoformat()
-                logger.info("Successfully trained and loaded initial baseline model.")
-        except Exception as exc:
-            logger.error(f"Failed to auto-train initial baseline model: {exc}")
+
+def create_instant_baseline_model():
+    """Initialize a fast baseline model in memory (<0.01s) for instant container startup."""
+    try:
+        from sklearn.linear_model import LogisticRegression
+
+        from src.preprocessing import prepare_data
+
+        dummy_df = pd.DataFrame({
+            "tenure": [1, 12, 24, 48, 60],
+            "MonthlyCharges": [20.0, 50.0, 70.0, 90.0, 100.0],
+            "TotalCharges": [20.0, 600.0, 1680.0, 4320.0, 6000.0],
+            "Contract": ["Month-to-month", "One year", "Two year", "Two year", "Two year"],
+            "InternetService": ["DSL", "Fiber optic", "DSL", "No", "Fiber optic"],
+            "PaymentMethod": ["Electronic check", "Mailed check", "Bank transfer", "Credit card", "Electronic check"],
+            "Churn": ["No", "No", "No", "No", "Yes"],
+        })
+        X, _, preprocessor, _ = prepare_data(dummy_df.drop(columns=["Churn"]), fit=True)
+        clf = LogisticRegression()
+        clf.fit(X, [0, 0, 0, 0, 1])
+
+        preprocessor.target_col_ = "Churn"  # type: ignore
+        preprocessor.id_cols_ = []  # type: ignore
+        preprocessor.task_type_ = "classification"  # type: ignore
+
+        model_store["model"] = clf
+        model_store["preprocessor"] = preprocessor
+        model_store["version"] = "1.0-baseline"
+        model_store["stage"] = "InitialBaseline"
+        model_store["loaded_at"] = datetime.now(timezone.utc).isoformat()
+        logger.info("Successfully initialized instant startup baseline model.")
+    except Exception as exc:
+        logger.error(f"Failed to create instant baseline model: {exc}")
 
 
 def check_rate_limit(request: Request):
