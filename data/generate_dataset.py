@@ -89,7 +89,7 @@ def generate_telco_churn_data(num_samples: int = 7043, seed: int = 42) -> pd.Dat
     )
 
     churn_prob = 1 / (1 + np.exp(-churn_score))
-    churn = np.where(churn_prob > 0.62, "Yes", "No")
+    churn = np.where(churn_prob > np.percentile(churn_prob, 73), "Yes", "No")
 
     df = pd.DataFrame(
         {
