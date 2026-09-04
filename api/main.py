@@ -1112,15 +1112,9 @@ def root():
                 <div class="brand-text">
                     <div class="brand-text-header">
                         <h1>ChurnOps</h1>
-                        <span class="status-pill"><span class="status-dot"></span> Studio v1.0</span>
                     </div>
                     <p>Production MLOps Platform & Diagnostic System</p>
                 </div>
-            </div>
-            <div class="nav-actions">
-                <a href="/docs" target="_blank" class="btn-link">&#128216; API Docs</a>
-                <a href="/health" target="_blank" class="btn-link">&#128147; Health Probe</a>
-                <a href="https://github.com/bishtprateek270-hue/churnops" target="_blank" class="btn-link">&#128191; GitHub</a>
             </div>
         </div>
     </header>
@@ -1132,7 +1126,6 @@ def root():
             <button class="tab-btn" onclick="switchTab('tab-row', event)">🎯 3. Predict Dataset Row</button>
             <button class="tab-btn" onclick="switchTab('tab-batch', event)">⚡ 4. Batch CSV Inference</button>
             <button class="tab-btn" onclick="switchTab('tab-custom', event)">📝 5. Custom Single Form</button>
-            <button class="tab-btn" onclick="switchTab('tab-health', event)">📈 6. Service Telemetry</button>
         </nav>
 
         <!-- TAB 1: UPLOAD & TRAIN -->
@@ -1334,21 +1327,6 @@ def root():
                     <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-primary);">Prediction Output</h3>
                     <pre class="json-preview" id="customJsonOutput"></pre>
                 </div>
-            </div>
-        </div>
-
-        <!-- TAB 6: TELEMETRY & HEALTH -->
-        <div id="tab-health" class="tab-content">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Service Telemetry & Environment Health</h2>
-                    <p class="card-desc">Active model store state, database logging health, and endpoint URLs.</p>
-                </div>
-
-                <div class="metrics-grid" id="healthMetrics"></div>
-
-                <h3 style="font-size: 0.95rem; font-weight: 700; margin: 1.35rem 0 0.5rem 0; color: var(--text-primary);">Health Response Payload</h3>
-                <pre class="json-preview" id="healthJson"></pre>
             </div>
         </div>
     </main>
