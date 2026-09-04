@@ -245,8 +245,8 @@ class GenericFeatureEngineer(BaseEstimator, TransformerMixin):
         return X_out
 
 
-sys.modules["__main__"].GenericFeatureEngineer = GenericFeatureEngineer
-sys.modules["__main__"].ChurnFeatureEngineer = GenericFeatureEngineer
+setattr(sys.modules["__main__"], "GenericFeatureEngineer", GenericFeatureEngineer)  # noqa: B010
+setattr(sys.modules["__main__"], "ChurnFeatureEngineer", GenericFeatureEngineer)  # noqa: B010
 ChurnFeatureEngineer = GenericFeatureEngineer
 
 
