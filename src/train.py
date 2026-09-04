@@ -604,22 +604,23 @@ def train_and_evaluate(
 
     # Log winning model artifact and register in MLflow Model Registry
     registered_version = "local-1"
-    try:
-        import warnings
-        if best_run_id:
-            with mlflow.start_run(run_id=best_run_id):
-                mlflow.sklearn.log_model(best_model_obj, artifact_path="model", serialization_format="cloudpickle")
-        model_uri = f"runs:/{best_run_id}/model"
-        registered_model = mlflow.register_model(model_uri, MODEL_NAME)
-        client = mlflow.tracking.MlflowClient()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=FutureWarning)
-            client.transition_model_version_stage(  # type: ignore
-                name=MODEL_NAME, version=registered_model.version, stage="Staging", archive_existing_versions=False
-            )
-        registered_version = registered_model.version
-    except Exception as exc:
-        print(f"Notice: MLflow registry registration note: {exc}")
+    if not fast_mode:
+        try:
+            import warnings
+            if best_run_id:
+                with mlflow.start_run(run_id=best_run_id):
+                    mlflow.sklearn.log_model(best_model_obj, artifact_path="model", serialization_format="cloudpickle")
+            model_uri = f"runs:/{best_run_id}/model"
+            registered_model = mlflow.register_model(model_uri, MODEL_NAME)
+            client = mlflow.tracking.MlflowClient()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=FutureWarning)
+                client.transition_model_version_stage(  # type: ignore
+                    name=MODEL_NAME, version=registered_model.version, stage="Staging", archive_existing_versions=False
+                )
+            registered_version = registered_model.version
+        except Exception as exc:
+            print(f"Notice: MLflow registry registration note: {exc}")
 
     # Save Unified End-to-End Pipeline Artifact
     full_pipeline = {

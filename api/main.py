@@ -21,6 +21,7 @@ os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import sqlite3
+import threading
 
 import joblib
 import mlflow
@@ -365,35 +366,95 @@ async def upload_dataset_api(file: UploadFile = File(...)):  # noqa: B008
         raise HTTPException(status_code=400, detail=f"Error reading uploaded CSV: {str(exc)}") from exc
 
 
-@app.post("/dataset/train")
-async def train_dataset_api(payload: dict):
-    """Train model suite on uploaded dataset and reload active model store."""
+# Background training state
+training_job_status: dict[str, Any] = {
+    "status": "idle",
+    "progress": 0,
+    "message": "Ready to train",
+    "result": None,
+    "error": None,
+    "updated_at": None,
+}
+
+
+def update_training_progress(percent: int, message: str) -> None:
+    training_job_status["progress"] = percent
+    training_job_status["message"] = message
+    training_job_status["updated_at"] = time.time()
+
+
+def run_background_training(data_path: str, target_col: str, fast_mode: bool) -> None:
+    global training_job_status
     try:
-        target_col = payload.get("target_col")
-        fast_mode = payload.get("fast_mode", True)
-        data_path = "data/raw/user_upload.csv" if os.path.exists("data/raw/user_upload.csv") else "data/raw/telco_churn.csv"
-
-        if not os.path.exists(data_path):
-            raise HTTPException(status_code=400, detail="No dataset found. Please upload a CSV first.")
-
-        df = pd.read_csv(data_path)
-        if target_col and target_col not in df.columns:
-            raise HTTPException(status_code=400, detail=f"Target column '{target_col}' not found in dataset.")
+        training_job_status["status"] = "running"
+        training_job_status["progress"] = 10
+        training_job_status["message"] = "Initializing leak-free preprocessing & data split..."
+        training_job_status["error"] = None
+        training_job_status["result"] = None
 
         from src.train import train_and_evaluate
-        result = train_and_evaluate(data_path=data_path, target_col=target_col, fast_mode=fast_mode)
 
-        # Reload active model store
+        result = train_and_evaluate(
+            data_path=data_path,
+            target_col=target_col,
+            fast_mode=fast_mode,
+            progress_callback=update_training_progress,
+        )
+
         load_model_and_preprocessor()
 
-        return {
-            "status": "success",
-            "result": result,
-            "active_model": model_store.get("version", "1.0"),
-        }
+        training_job_status["status"] = "completed"
+        training_job_status["progress"] = 100
+        training_job_status["message"] = "Model suite training completed successfully!"
+        training_job_status["result"] = result
     except Exception as exc:
-        logger.error(f"Error training dataset via API: {exc}")
-        raise HTTPException(status_code=500, detail=f"Training failed: {str(exc)}") from exc
+        logger.error(f"Background training failed: {exc}")
+        training_job_status["status"] = "failed"
+        training_job_status["progress"] = 0
+        training_job_status["message"] = f"Training failed: {str(exc)}"
+        training_job_status["error"] = str(exc)
+
+
+
+@app.post("/dataset/train")
+async def train_dataset_api(payload: dict):
+    """Start model suite training asynchronously in the background."""
+    if training_job_status["status"] == "running":
+        return {
+            "status": "processing",
+            "message": "Training is already in progress.",
+            "progress": training_job_status["progress"],
+        }
+
+    target_col = payload.get("target_col")
+    fast_mode = payload.get("fast_mode", True)
+    data_path = "data/raw/user_upload.csv" if os.path.exists("data/raw/user_upload.csv") else "data/raw/telco_churn.csv"
+
+    if not os.path.exists(data_path):
+        raise HTTPException(status_code=400, detail="No dataset found. Please upload a CSV first.")
+
+    df = pd.read_csv(data_path)
+    if target_col and target_col not in df.columns:
+        raise HTTPException(status_code=400, detail=f"Target column '{target_col}' not found in dataset.")
+
+    thread = threading.Thread(
+        target=run_background_training,
+        args=(data_path, target_col, fast_mode),
+        daemon=True,
+    )
+    thread.start()
+
+    return {
+        "status": "started",
+        "message": "Training started in background.",
+        "progress": 5,
+    }
+
+
+@app.get("/dataset/train/status")
+def get_training_status():
+    """Get real-time background training progress and metrics."""
+    return training_job_status
 
 
 @app.get("/dataset/preview")
@@ -1176,12 +1237,47 @@ def root():
             table.innerHTML = thead + tbody;
         }
 
+        async function pollTrainingStatus() {
+            const btn = document.getElementById('trainBtn');
+            const pollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await fetch('/dataset/train/status');
+                    if (!statusRes.ok) return;
+                    const statusData = await statusRes.json();
+
+                    const pct = statusData.progress || 0;
+                    const msg = statusData.message || 'Training in progress...';
+                    document.getElementById('trainSpinner').innerText = pct + '%';
+                    document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">&#9881;&#65039; ' + msg + ' (' + pct + '%)</div>';
+
+                    if (statusData.status === 'completed') {
+                        clearInterval(pollInterval);
+                        if (btn) btn.disabled = false;
+                        document.getElementById('trainSpinner').innerText = 'Train';
+                        const bestName = (statusData.result && statusData.result.best_model_name) ? statusData.result.best_model_name : 'Best Model';
+                        const totalTime = (statusData.result && statusData.result.total_time_seconds) ? statusData.result.total_time_seconds : '0';
+                        document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-success">&#127881; Training complete! Best Model: <strong>' + bestName + '</strong> in ' + totalTime + 's</div>';
+                        if (statusData.result) {
+                            renderResults(statusData.result);
+                        }
+                    } else if (statusData.status === 'failed') {
+                        clearInterval(pollInterval);
+                        if (btn) btn.disabled = false;
+                        document.getElementById('trainSpinner').innerText = 'Train';
+                        document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Training failed: ' + (statusData.error || statusData.message || 'Unknown error') + '</div>';
+                    }
+                } catch (e) {
+                    console.error('Status poll error:', e);
+                }
+            }, 1200);
+        }
+
         async function trainModel() {
             const btn = document.getElementById('trainBtn');
             const target_col = document.getElementById('targetSelect').value;
             if (btn) btn.disabled = true;
-            document.getElementById('trainSpinner').innerText = '...';
-            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">&#8987; Training model suite across 5 algorithms... Please wait ~10s...</div>';
+            document.getElementById('trainSpinner').innerText = '0%';
+            document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-info">&#8987; Starting model suite training in background...</div>';
             document.getElementById('uploadStatus').scrollIntoView({ behavior: 'smooth', block: 'center' });
 
             try {
@@ -1199,19 +1295,23 @@ def root():
                     data = { detail: 'Server response parsing failed (HTTP ' + res.status + ' ' + (res.statusText || 'Error') + '). ' + (rawText ? rawText.substring(0, 100) : '') };
                 }
 
-                if (btn) btn.disabled = false;
-                document.getElementById('trainSpinner').innerText = 'Train';
-
-                if (res.ok && data.status === 'success') {
-                    document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-success">&#127881; Training complete! Best Model: <strong>' + data.result.best_model_name + '</strong> in ' + data.result.total_time_seconds + 's</div>';
-                    renderResults(data.result);
+                if (res.ok && (data.status === 'started' || data.status === 'processing' || data.status === 'success')) {
+                    if (data.status === 'success' && data.result) {
+                        if (btn) btn.disabled = false;
+                        document.getElementById('trainSpinner').innerText = 'Train';
+                        renderResults(data.result);
+                    } else {
+                        pollTrainingStatus();
+                    }
                 } else {
-                    document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Training failed: ' + (data.detail || 'Server Error') + '</div>';
+                    if (btn) btn.disabled = false;
+                    document.getElementById('trainSpinner').innerText = 'Train';
+                    document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Training failed: ' + (data.detail || data.message || 'Server Error') + '</div>';
                 }
             } catch (err) {
                 if (btn) btn.disabled = false;
                 document.getElementById('trainSpinner').innerText = 'Train';
-                document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Error during training: ' + err.message + '</div>';
+                document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; Error starting training: ' + err.message + '</div>';
             }
         }
 
