@@ -6,11 +6,10 @@ Supports both Classification and Regression tasks with robust missing value and 
 import os
 import sys
 
-import __main__
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import re
+from typing import Any
 
 import joblib
 import numpy as np
@@ -191,8 +190,8 @@ class GenericFeatureEngineer(BaseEstimator, TransformerMixin):
 
     def fit(self, X, y=None):
         if isinstance(X, pd.DataFrame):
-            num_cols = X.select_dtypes(include=[np.number]).columns.tolist()
-            cat_cols = X.select_dtypes(exclude=[np.number]).columns.tolist()
+            num_cols = X.select_dtypes(include="number").columns.tolist()
+            cat_cols = X.select_dtypes(exclude="number").columns.tolist()
             self.interaction_pair_ = (num_cols[0], num_cols[1]) if len(num_cols) >= 2 else None
             self.has_cat_cols_ = bool(cat_cols)
             self.cat_cols_ = cat_cols
@@ -217,7 +216,7 @@ class GenericFeatureEngineer(BaseEstimator, TransformerMixin):
             else:
                 X_out[ratio_name] = np.nan
         else:
-            num_cols = X_out.select_dtypes(include=[np.number]).columns.tolist()
+            num_cols = X_out.select_dtypes(include="number").columns.tolist()
             if len(num_cols) >= 2:
                 col1, col2 = num_cols[0], num_cols[1]
                 val1 = pd.to_numeric(X_out[col1], errors="coerce").fillna(0.0)
@@ -230,7 +229,7 @@ class GenericFeatureEngineer(BaseEstimator, TransformerMixin):
         # 2. Total active non-null categorical services/features count
         has_cat = getattr(self, "has_cat_cols_", False)
         known_cats = getattr(self, "cat_cols_", [])
-        cat_cols_in_x = X_out.select_dtypes(exclude=[np.number]).columns.tolist()
+        cat_cols_in_x = X_out.select_dtypes(exclude="number").columns.tolist()
 
         if has_cat or cat_cols_in_x or known_cats:
             non_null_counts = pd.Series(0.0, index=X_out.index)
@@ -246,8 +245,8 @@ class GenericFeatureEngineer(BaseEstimator, TransformerMixin):
         return X_out
 
 
-__main__.GenericFeatureEngineer = GenericFeatureEngineer
-__main__.ChurnFeatureEngineer = GenericFeatureEngineer
+sys.modules["__main__"].GenericFeatureEngineer = GenericFeatureEngineer
+sys.modules["__main__"].ChurnFeatureEngineer = GenericFeatureEngineer
 ChurnFeatureEngineer = GenericFeatureEngineer
 
 
@@ -369,7 +368,7 @@ def prepare_data(
     preprocessor: ColumnTransformer | Pipeline | None = None,
     fit: bool = True,
     target_col: str | None = None,
-) -> tuple[np.ndarray, np.ndarray | None, object, list[str]]:
+) -> tuple[Any, np.ndarray | None, Any, list[str]]:
     """Clean, engineer features, preprocess data, and extract target variable safely."""
     df_clean = clean_dataframe(df)
 
@@ -404,11 +403,13 @@ def prepare_data(
                     y = np.where(labels < 0, 0, labels)
             else:
                 num_vals = pd.to_numeric(target_series, errors="coerce").fillna(0.0)
-                unique_nums = set(np.unique(num_vals.values))
+                num_arr = np.asarray(num_vals.values, dtype=np.float64)
+                unique_nums = set(np.unique(num_arr).tolist())
                 if unique_nums.issubset({0, 1}):
-                    y = np.where(num_vals.values > 0.5, 1, 0)
+                    y = np.where(num_arr > 0.5, 1, 0)
                 else:
-                    y = np.where(num_vals.values > np.median(num_vals.values), 1, 0)
+                    med_val = float(np.median(num_arr))
+                    y = np.where(num_arr > med_val, 1, 0)
             y = np.asarray(y, dtype=np.int64)
         else:
             # Continuous Regression
@@ -434,8 +435,8 @@ def prepare_data(
 
         engineer = GenericFeatureEngineer()
         X_engineered = engineer.transform(X_df)
-        num_cols = X_engineered.select_dtypes(include=[np.number]).columns.tolist()
-        cat_cols = X_engineered.select_dtypes(exclude=[np.number]).columns.tolist()
+        num_cols = X_engineered.select_dtypes(include="number").columns.tolist()
+        cat_cols = X_engineered.select_dtypes(exclude="number").columns.tolist()
 
         cat_low_cols = [c for c in cat_cols if X_engineered[c].nunique() <= 20]
         cat_high_cols = [c for c in cat_cols if X_engineered[c].nunique() > 20]
@@ -452,15 +453,15 @@ def prepare_data(
         X_trans = pipeline.transform(X_df)
 
         preprocessor = pipeline
-        preprocessor.feature_cols_ = list(X_df.columns)
-        preprocessor.id_cols_ = id_cols
-        preprocessor.leakage_cols_ = leakage_cols
-        preprocessor.num_cols_ = num_cols
-        preprocessor.cat_low_cols_ = cat_low_cols
-        preprocessor.cat_high_cols_ = cat_high_cols
-        preprocessor.target_col_ = found_target
-        preprocessor.task_type_ = task_type
-        preprocessor.feature_names_ = get_feature_names(preprocessor)
+        preprocessor.feature_cols_ = list(X_df.columns)  # type: ignore
+        preprocessor.id_cols_ = id_cols  # type: ignore
+        preprocessor.leakage_cols_ = leakage_cols  # type: ignore
+        preprocessor.num_cols_ = num_cols  # type: ignore
+        preprocessor.cat_low_cols_ = cat_low_cols  # type: ignore
+        preprocessor.cat_high_cols_ = cat_high_cols  # type: ignore
+        preprocessor.target_col_ = found_target  # type: ignore
+        preprocessor.task_type_ = task_type  # type: ignore
+        preprocessor.feature_names_ = get_feature_names(preprocessor)  # type: ignore
     else:
         feature_cols = getattr(preprocessor, "feature_cols_", None)
         id_cols = getattr(preprocessor, "id_cols_", [])
