@@ -173,8 +173,8 @@ def infer_task_type(target_series: pd.Series) -> str:
     if dtype_str in ["object", "string", "category", "bool"] or pd.api.types.is_bool_dtype(valid_series):
         return "classification"
 
-    # Discrete integers or floats with few unique values -> classification
-    if num_unique <= 20 and (num_unique / len(valid_series)) < 0.1:
+    # Discrete binary (0/1) or low cardinality targets -> classification
+    if num_unique <= 2 or (num_unique <= 20 and (num_unique / len(valid_series)) <= 0.20):
         return "classification"
 
     # Continuous numerical floats or high-cardinality numbers -> regression

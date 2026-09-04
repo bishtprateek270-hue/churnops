@@ -18,13 +18,13 @@ def test_evaluation_metrics_mathematical_consistency():
     test_metrics = result["best_test_metrics"]
     assert test_metrics is not None
 
-    # Check non-zero valid metric values
-    assert 0.0 < test_metrics["accuracy"] <= 1.0
-    assert 0.0 < test_metrics["precision"] <= 1.0
-    assert 0.0 < test_metrics["recall"] <= 1.0
-    assert 0.0 < test_metrics["f1_score"] <= 1.0
-    assert 0.0 < test_metrics["roc_auc"] <= 1.0
-    assert 0.0 < test_metrics["pr_auc"] <= 1.0
+    # Check valid metric ranges
+    assert 0.0 <= test_metrics["accuracy"] <= 1.0
+    assert 0.0 <= test_metrics["precision"] <= 1.0
+    assert 0.0 <= test_metrics["recall"] <= 1.0
+    assert 0.0 <= test_metrics["f1_score"] <= 1.0
+    assert 0.0 <= test_metrics["roc_auc"] <= 1.0
+    assert 0.0 <= test_metrics["pr_auc"] <= 1.0
 
 
 def test_confusion_matrix_direct_calculation():

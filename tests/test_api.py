@@ -20,7 +20,7 @@ def setup_mock_model_and_db(tmp_path):
 
     # Fit real preprocessor on sample data
     df = generate_telco_churn_data(num_samples=20, seed=789)
-    _, _, preprocessor, _ = prepare_data(df, fit=True)
+    _, _, preprocessor, _ = prepare_data(df, target_col="Churn", fit=True)
 
     # Mock model
     mock_model = MagicMock()
