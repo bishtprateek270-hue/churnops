@@ -601,6 +601,8 @@ def root():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ChurnOps — Production MLOps Studio & Model Monitoring</title>
+    <link rel="icon" type="image/png" href="/reports/favicon.png">
+    <link rel="shortcut icon" href="/reports/favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -672,32 +674,36 @@ def root():
             gap: 0.85rem;
         }
 
-        .brand-icon {
-            background: var(--text-primary);
-            color: #ffffff;
-            width: 38px;
-            height: 38px;
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .brand-logo-img {
+            height: 44px;
+            width: auto;
+            object-fit: contain;
+            display: block;
+        }
+
+        .brand-title {
+            font-size: 1.45rem;
             font-weight: 800;
-            font-size: 1.15rem;
+            line-height: 1.1;
             letter-spacing: -0.03em;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .brand-text-header {
             display: flex;
             align-items: center;
-            gap: 0.6rem;
         }
 
-        .brand-text h1 {
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            letter-spacing: -0.02em;
+        .brand-churn {
+            color: #0b1b3d;
+        }
+
+        .brand-ops {
+            color: #0066ff;
+        }
+
+        .brand-subtitle {
+            font-size: 0.775rem;
+            font-weight: 500;
+            color: #64748b;
+            letter-spacing: 0.02em;
+            margin-top: 0.15rem;
         }
 
         .status-pill {
@@ -1108,12 +1114,10 @@ def root():
     <header class="header">
         <div class="header-content">
             <div class="brand">
-                <div class="brand-icon">&#9889;</div>
+                <img src="/reports/logo_icon.png" alt="ChurnOps Logo" class="brand-logo-img">
                 <div class="brand-text">
-                    <div class="brand-text-header">
-                        <h1>ChurnOps</h1>
-                    </div>
-                    <p>Production MLOps Platform & Diagnostic System</p>
+                    <h1 class="brand-title"><span class="brand-churn">Churn</span><span class="brand-ops">Ops</span></h1>
+                    <p class="brand-subtitle">Predict &bull; Monitor &bull; Optimize</p>
                 </div>
             </div>
         </div>

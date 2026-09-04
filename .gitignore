@@ -32,6 +32,9 @@ mlflow.db
 monitoring/predictions.db
 *.db
 reports/
+!reports/logo_icon.png
+!reports/favicon.png
+!reports/favicon.ico
 
 # Data & Models (tracked by DVC or generated)
 data/processed/
