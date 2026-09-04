@@ -33,6 +33,7 @@ monitoring/predictions.db
 *.db
 reports/
 !reports/logo_icon.png
+!reports/logo_icon_opt.png
 !reports/favicon.png
 !reports/favicon.ico
 
