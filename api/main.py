@@ -1258,7 +1258,8 @@ def root():
                     </div>
                 </div>
 
-                <button class="btn-primary" onclick="runBatchPrediction()">&#9889; Run Batch Prediction</button>
+                <button class="btn-primary" id="runBatchBtn" onclick="runBatchPrediction()">&#9889; Run Batch Prediction</button>
+                <div id="batchStatus" style="margin-top: 1rem;"></div>
 
                 <div id="batchResultsContainer" style="display: none; margin-top: 1.35rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
@@ -1368,7 +1369,23 @@ def root():
         let activeDataset = null;
         let batchResultsData = null;
 
-        function switchTab(tabId, evt) {
+        async function ensureActiveDataset() {
+            if (activeDataset && activeDataset.preview) return activeDataset;
+            try {
+                const res = await fetch('/dataset/preview');
+                const data = await res.json();
+                if (data.has_dataset) {
+                    activeDataset = data;
+                    renderDatasetInfo(data);
+                    return activeDataset;
+                }
+            } catch(e) {
+                console.error('Error fetching active dataset:', e);
+            }
+            return null;
+        }
+
+        async function switchTab(tabId, evt) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
@@ -1380,8 +1397,12 @@ def root():
                 targetEl.classList.add('active');
             }
 
-            if (tabId === 'tab-row' && activeDataset) {
+            if (tabId === 'tab-row') {
+                await ensureActiveDataset();
                 loadRowPreview();
+            }
+            if (tabId === 'tab-batch') {
+                await ensureActiveDataset();
             }
             if (tabId === 'tab-graphs') {
                 loadDatasetGraphs();
@@ -1393,14 +1414,7 @@ def root():
 
         async function initPage() {
             setupDragAndDrop();
-            try {
-                const res = await fetch('/dataset/preview');
-                const data = await res.json();
-                if (data.has_dataset) {
-                    activeDataset = data;
-                    renderDatasetInfo(data);
-                }
-            } catch(e) {}
+            await ensureActiveDataset();
             loadDatasetGraphs();
         }
 
@@ -1736,21 +1750,44 @@ def root():
         }
 
         async function runBatchPrediction() {
+            const btn = document.getElementById('runBatchBtn');
+            const statusDiv = document.getElementById('batchStatus');
+
+            if (btn) btn.disabled = true;
+            if (statusDiv) statusDiv.innerHTML = '<div class="alert alert-info">&#8987; Fetching dataset and generating batch predictions...</div>';
+
+            const ds = await ensureActiveDataset();
+            if (!ds || !ds.preview || !ds.preview.length) {
+                if (btn) btn.disabled = false;
+                if (statusDiv) statusDiv.innerHTML = '<div class="alert alert-warning">&#9888; No active dataset loaded. Please upload a CSV dataset on Tab 1 (Dataset Upload & Train) first.</div>';
+                return;
+            }
+
             const limit = parseInt(document.getElementById('batchLimit').value) || 50;
-            if (!activeDataset || !activeDataset.preview) return;
+            const samples = ds.preview.slice(0, limit);
 
-            const samples = activeDataset.preview.slice(0, limit);
-            const res = await fetch('/predict/batch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ customers: samples })
-            });
+            try {
+                const res = await fetch('/predict/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ customers: samples })
+                });
 
-            const data = await res.json();
-            if (res.ok) {
-                batchResultsData = data.results;
-                renderTable('batchTable', data.results);
-                document.getElementById('batchResultsContainer').style.display = 'block';
+                const data = await res.json();
+                if (btn) btn.disabled = false;
+
+                if (res.ok) {
+                    if (statusDiv) statusDiv.innerHTML = '<div class="alert alert-success">&#9989; Batch predictions completed for ' + (data.total_processed || samples.length) + ' records in ' + (data.processing_time_ms || 0) + ' ms.</div>';
+                    batchResultsData = data.results;
+                    renderTable('batchTable', data.results);
+                    document.getElementById('batchResultsContainer').style.display = 'block';
+                    document.getElementById('batchResultsContainer').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    if (statusDiv) statusDiv.innerHTML = '<div class="alert alert-danger">&#10060; Batch prediction failed: ' + (data.detail || 'Server error') + '</div>';
+                }
+            } catch (err) {
+                if (btn) btn.disabled = false;
+                if (statusDiv) statusDiv.innerHTML = '<div class="alert alert-danger">&#10060; Error executing batch prediction: ' + err.message + '</div>';
             }
         }
 
