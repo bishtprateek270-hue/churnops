@@ -357,12 +357,14 @@ async def upload_dataset_api(file: UploadFile = File(...)):  # noqa: B008
         preview_records = df.head(10).to_dict(orient="records")
 
         # Generate EDA plots immediately upon CSV upload
-        try:
-            from src.eda_inspector import generate_eda_report
+        if detected_target is not None:
+            try:
+                from src.eda_inspector import generate_eda_report
 
-            generate_eda_report(df, target_col=detected_target, output_dir="reports/eda")
-        except Exception as eda_err:
-            logger.warning(f"Notice: Upload EDA generation note: {eda_err}")
+                generate_eda_report(df, target_col=detected_target, output_dir="reports/eda")
+            except Exception as eda_err:
+                logger.warning(f"Notice: Upload EDA generation note: {eda_err}")
+
 
         return {
             "status": "success",
@@ -598,7 +600,7 @@ def root():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChurnOps - Machine Learning Studio & Monitoring</title>
+    <title>ChurnOps — Production MLOps Studio & Model Monitoring</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -609,9 +611,12 @@ def root():
             --text-primary: #0f172a;
             --text-secondary: #475569;
             --text-muted: #64748b;
-            --primary: #4f46e5;
-            --primary-hover: #4338ca;
-            --primary-light: #eef2ff;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --accent-light: #eff6ff;
+            --accent-border: #bfdbfe;
+            --dark-btn: #0f172a;
+            --dark-btn-hover: #1e293b;
             --success-bg: #f0fdf4;
             --success-text: #166534;
             --success-border: #bbf7d0;
@@ -621,6 +626,12 @@ def root():
             --danger-bg: #fef2f2;
             --danger-text: #991b1b;
             --danger-border: #fecaca;
+            --radius-sm: 6px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+            --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+            --shadow-hover: 0 6px 16px -4px rgba(15, 23, 42, 0.08), 0 2px 6px -2px rgba(15, 23, 42, 0.04);
         }
 
         * {
@@ -628,6 +639,7 @@ def root():
             margin: 0;
             padding: 0;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
 
         body {
@@ -640,14 +652,14 @@ def root():
         .header {
             background: #ffffff;
             border-bottom: 1px solid var(--border-color);
-            padding: 1rem 2rem;
+            padding: 0.85rem 2rem;
             position: sticky;
             top: 0;
             z-index: 100;
         }
 
         .header-content {
-            max-width: 1280px;
+            max-width: 1440px;
             margin: 0 auto;
             display: flex;
             justify-content: space-between;
@@ -657,94 +669,130 @@ def root():
         .brand {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.85rem;
         }
 
         .brand-icon {
-            background: var(--primary);
-            color: white;
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
+            background: var(--text-primary);
+            color: #ffffff;
+            width: 38px;
+            height: 38px;
+            border-radius: var(--radius-md);
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 800;
-            font-size: 1.1rem;
+            font-size: 1.15rem;
+            letter-spacing: -0.03em;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .brand-text-header {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
         }
 
         .brand-text h1 {
-            font-size: 1.25rem;
+            font-size: 1.15rem;
             font-weight: 700;
             color: var(--text-primary);
+            letter-spacing: -0.02em;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.15rem 0.55rem;
+            border-radius: 9999px;
+            font-size: 0.725rem;
+            font-weight: 600;
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #22c55e;
         }
 
         .brand-text p {
-            font-size: 0.8rem;
+            font-size: 0.775rem;
             color: var(--text-muted);
         }
 
         .nav-actions {
             display: flex;
-            gap: 0.75rem;
+            gap: 0.6rem;
         }
 
         .btn-link {
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
-            padding: 0.5rem 0.85rem;
+            padding: 0.45rem 0.85rem;
             background: #ffffff;
             border: 1px solid var(--border-color);
-            border-radius: 6px;
+            border-radius: var(--radius-md);
             color: var(--text-secondary);
-            font-size: 0.85rem;
+            font-size: 0.825rem;
             font-weight: 500;
             text-decoration: none;
             transition: all 0.15s ease;
         }
 
         .btn-link:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-            background: var(--primary-light);
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+            background: #f8fafc;
         }
 
         .main-container {
-            max-width: 1280px;
-            margin: 2rem auto;
-            padding: 0 1.5rem;
+            max-width: 1440px;
+            margin: 1.75rem auto;
+            padding: 0 1.75rem;
         }
 
         .tabs-nav {
             display: flex;
-            gap: 0.5rem;
+            gap: 0.35rem;
             border-bottom: 1px solid var(--border-color);
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.75rem;
             overflow-x: auto;
+            padding-bottom: 2px;
         }
 
         .tab-btn {
-            padding: 0.75rem 1.25rem;
+            padding: 0.65rem 1.1rem;
             background: transparent;
             border: none;
             border-bottom: 2px solid transparent;
             color: var(--text-muted);
             font-weight: 500;
-            font-size: 0.95rem;
+            font-size: 0.875rem;
             cursor: pointer;
             transition: all 0.15s ease;
             white-space: nowrap;
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
         }
 
         .tab-btn:hover {
             color: var(--text-primary);
+            background: rgba(241, 245, 249, 0.6);
         }
 
         .tab-btn.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
+            color: var(--accent);
+            border-bottom-color: var(--accent);
             font-weight: 600;
+            background: transparent;
         }
 
         .tab-content {
@@ -753,48 +801,62 @@ def root():
 
         .tab-content.active {
             display: block;
+            animation: fadeInSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes fadeInSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 1.5rem;
-            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-            margin-bottom: 1.5rem;
+            border-radius: var(--radius-lg);
+            padding: 1.75rem;
+            box-shadow: var(--shadow-card);
+            margin-bottom: 1.75rem;
+            transition: border-color 0.15s ease;
         }
 
         .card-header {
-            margin-bottom: 1.25rem;
+            margin-bottom: 1.35rem;
         }
 
         .card-title {
             font-size: 1.1rem;
             font-weight: 700;
             color: var(--text-primary);
+            letter-spacing: -0.015em;
         }
 
         .card-desc {
-            font-size: 0.875rem;
+            font-size: 0.85rem;
             color: var(--text-muted);
             margin-top: 0.25rem;
         }
 
         .dropzone {
             border: 2px dashed #cbd5e1;
-            border-radius: 8px;
-            padding: 2.5rem 1.5rem;
+            border-radius: var(--radius-lg);
+            padding: 2.75rem 1.5rem;
             text-align: center;
-            background: #f8fafc;
+            background: #fafafa;
             cursor: pointer;
-            transition: all 0.2s ease;
-            margin-bottom: 1.25rem;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-bottom: 1.35rem;
         }
 
         .dropzone:hover, .dropzone.dragover {
-            border-color: var(--primary);
-            background: var(--primary-light);
-            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+            border-color: var(--accent);
+            background: var(--accent-light);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
 
         .dropzone input {
@@ -802,38 +864,52 @@ def root():
         }
 
         .dropzone-icon {
-            font-size: 2rem;
+            font-size: 2.2rem;
             margin-bottom: 0.5rem;
+            color: var(--text-secondary);
         }
 
         .dropzone-text {
             font-weight: 600;
+            font-size: 0.95rem;
             color: var(--text-primary);
         }
 
         .dropzone-sub {
-            font-size: 0.85rem;
+            font-size: 0.825rem;
             color: var(--text-muted);
             margin-top: 0.25rem;
         }
 
         .btn-primary {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 0.65rem 1.25rem;
-            border-radius: 6px;
+            background: var(--dark-btn);
+            color: #ffffff;
+            border: 1px solid var(--dark-btn);
+            padding: 0.65rem 1.35rem;
+            border-radius: var(--radius-md);
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             cursor: pointer;
-            transition: background 0.15s ease;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
+            box-shadow: var(--shadow-sm);
         }
 
         .btn-primary:hover {
-            background: var(--primary-hover);
+            background: var(--dark-btn-hover);
+            border-color: var(--dark-btn-hover);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.985);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .btn-block {
@@ -843,9 +919,9 @@ def root():
 
         .form-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.25rem;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.1rem;
+            margin-bottom: 1.35rem;
         }
 
         .form-group {
@@ -855,29 +931,30 @@ def root():
         }
 
         .form-label {
-            font-size: 0.85rem;
+            font-size: 0.825rem;
             font-weight: 600;
             color: var(--text-secondary);
         }
 
         .form-control {
-            padding: 0.55rem 0.75rem;
+            padding: 0.6rem 0.85rem;
             border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 0.9rem;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
             color: var(--text-primary);
             background: #ffffff;
             outline: none;
+            transition: all 0.15s ease;
         }
 
         .form-control:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
         }
 
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 1rem;
             margin-top: 1rem;
         }
@@ -885,30 +962,40 @@ def root():
         .metric-tile {
             background: #f8fafc;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 1rem;
+            border-radius: var(--radius-md);
+            padding: 1.1rem 1.25rem;
+            transition: all 0.15s ease;
+        }
+
+        .metric-tile:hover {
+            border-color: var(--border-hover);
+            background: #ffffff;
+            box-shadow: var(--shadow-sm);
         }
 
         .metric-name {
-            font-size: 0.75rem;
+            font-size: 0.725rem;
             font-weight: 600;
             color: var(--text-muted);
             text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .metric-val {
             font-size: 1.5rem;
-            font-weight: 800;
+            font-weight: 700;
             color: var(--text-primary);
-            margin-top: 0.25rem;
+            margin-top: 0.35rem;
+            letter-spacing: -0.02em;
         }
 
         .data-table-container {
             overflow-x: auto;
-            max-height: 350px;
+            max-height: 380px;
             border: 1px solid var(--border-color);
-            border-radius: 6px;
+            border-radius: var(--radius-md);
             margin-top: 1rem;
+            background: #ffffff;
         }
 
         table {
@@ -919,60 +1006,102 @@ def root():
         }
 
         th {
-            background: #f1f5f9;
+            background: #f8fafc;
             color: var(--text-secondary);
             font-weight: 600;
-            padding: 0.6rem 0.85rem;
+            font-size: 0.775rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 0.75rem 1rem;
             position: sticky;
             top: 0;
             border-bottom: 1px solid var(--border-color);
+            z-index: 10;
         }
 
         td {
-            padding: 0.55rem 0.85rem;
+            padding: 0.65rem 1rem;
             border-bottom: 1px solid #f1f5f9;
             color: var(--text-primary);
             white-space: nowrap;
+            font-variant-numeric: tabular-nums;
         }
 
-        tr:hover {
+        tr:hover td {
             background: #f8fafc;
         }
 
         .badge {
-            display: inline-block;
-            padding: 0.25rem 0.6rem;
-            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            padding: 0.2rem 0.55rem;
+            border-radius: var(--radius-sm);
             font-size: 0.75rem;
             font-weight: 600;
+            line-height: 1;
         }
 
         .badge-success { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
         .badge-warning { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
         .badge-danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+        .badge-info { background: var(--accent-light); color: #1e40af; border: 1px solid var(--accent-border); }
 
         .json-preview {
             background: #0f172a;
             color: #38bdf8;
-            padding: 1rem;
-            border-radius: 6px;
-            font-family: monospace;
-            font-size: 0.85rem;
-            max-height: 250px;
+            padding: 1.1rem;
+            border-radius: var(--radius-md);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.825rem;
+            line-height: 1.6;
+            max-height: 280px;
             overflow-y: auto;
         }
 
         .alert {
-            padding: 0.85rem 1rem;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
+            padding: 0.85rem 1.1rem;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            margin-bottom: 1.1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .alert-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+        .alert-info { background: var(--accent-light); color: #1e40af; border: 1px solid var(--accent-border); }
         .alert-success { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
         .alert-warning { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
         .alert-danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+
+        .graph-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.1rem;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .graph-card:hover {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-2px);
+        }
+
+        @keyframes modalScaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
     </style>
 </head>
 <body>
@@ -981,8 +1110,11 @@ def root():
             <div class="brand">
                 <div class="brand-icon">&#9889;</div>
                 <div class="brand-text">
-                    <h1>ChurnOps</h1>
-                    <p>Machine Learning Studio & Monitoring System</p>
+                    <div class="brand-text-header">
+                        <h1>ChurnOps</h1>
+                        <span class="status-pill"><span class="status-dot"></span> Studio v1.0</span>
+                    </div>
+                    <p>Production MLOps Platform & Diagnostic System</p>
                 </div>
             </div>
             <div class="nav-actions">
@@ -1036,11 +1168,11 @@ def root():
                         </div>
                     </div>
 
-                    <div style="margin-bottom: 1.25rem;">
+                    <div style="margin-bottom: 1.35rem;">
                         <button class="btn-primary" id="trainBtn" onclick="trainModel()"><span id="trainSpinner">&#9889;</span> Train Leak-Free Model Suite</button>
                     </div>
 
-                    <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">Dataset Preview (First 10 Rows)</h3>
+                    <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-primary);">Dataset Preview (First 10 Rows)</h3>
                     <div class="data-table-container">
                         <table id="previewTable"></table>
                     </div>
@@ -1083,7 +1215,7 @@ def root():
             </div>
         </div>
 
-        <!-- TAB 2: ROW PREDICTOR -->
+        <!-- TAB 3: ROW PREDICTOR -->
         <div id="tab-row" class="tab-content">
             <div class="card">
                 <div class="card-header">
@@ -1098,20 +1230,20 @@ def root():
                     </div>
                 </div>
 
-                <div style="margin-bottom: 1rem;">
+                <div style="margin-bottom: 1.25rem;">
                     <button class="btn-primary" id="predictRowBtn" onclick="predictRow()"><span id="predictRowSpinner">&#9889;</span> Predict Selected Row</button>
                 </div>
 
                 <div id="rowOutputContainer" style="display: none;">
-                    <div class="metrics-grid" id="rowResultMetrics" style="margin-bottom: 1.25rem;"></div>
+                    <div class="metrics-grid" id="rowResultMetrics" style="margin-bottom: 1.35rem;"></div>
 
-                    <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">Clean Row Features JSON (ID & Target Stripped)</h3>
+                    <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-primary);">Clean Row Features JSON (ID & Target Stripped)</h3>
                     <pre class="json-preview" id="rowJsonPreview"></pre>
                 </div>
             </div>
         </div>
 
-        <!-- TAB 3: BATCH CSV -->
+        <!-- TAB 4: BATCH CSV -->
         <div id="tab-batch" class="tab-content">
             <div class="card">
                 <div class="card-header">
@@ -1128,9 +1260,9 @@ def root():
 
                 <button class="btn-primary" onclick="runBatchPrediction()">&#9889; Run Batch Prediction</button>
 
-                <div id="batchResultsContainer" style="display: none; margin-top: 1.25rem;">
+                <div id="batchResultsContainer" style="display: none; margin-top: 1.35rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <h3 style="font-size: 0.95rem; font-weight: 700;">Batch Predictions Output</h3>
+                        <h3 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">Batch Predictions Output</h3>
                         <button class="btn-link" onclick="downloadBatchCSV()">&#128229; Download CSV</button>
                     </div>
                     <div class="data-table-container">
@@ -1140,7 +1272,7 @@ def root():
             </div>
         </div>
 
-        <!-- TAB 4: CUSTOM SINGLE INPUT -->
+        <!-- TAB 5: CUSTOM SINGLE INPUT -->
         <div id="tab-custom" class="tab-content">
             <div class="card">
                 <div class="card-header">
@@ -1197,14 +1329,14 @@ def root():
                     <button type="submit" class="btn-primary">&#9889; Run Live Prediction</button>
                 </form>
 
-                <div id="customResult" style="display: none; margin-top: 1.25rem;">
-                    <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">Prediction Output</h3>
+                <div id="customResult" style="display: none; margin-top: 1.35rem;">
+                    <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-primary);">Prediction Output</h3>
                     <pre class="json-preview" id="customJsonOutput"></pre>
                 </div>
             </div>
         </div>
 
-        <!-- TAB 5: TELEMETRY & HEALTH -->
+        <!-- TAB 6: TELEMETRY & HEALTH -->
         <div id="tab-health" class="tab-content">
             <div class="card">
                 <div class="card-header">
@@ -1214,19 +1346,19 @@ def root():
 
                 <div class="metrics-grid" id="healthMetrics"></div>
 
-                <h3 style="font-size: 0.95rem; font-weight: 700; margin: 1.25rem 0 0.5rem 0;">Health Response Payload</h3>
+                <h3 style="font-size: 0.95rem; font-weight: 700; margin: 1.35rem 0 0.5rem 0; color: var(--text-primary);">Health Response Payload</h3>
                 <pre class="json-preview" id="healthJson"></pre>
             </div>
         </div>
     </main>
 
     <!-- Graph Modal Lightbox -->
-    <div id="graphModal" onclick="closeGraphModal(event)" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); z-index: 1000; align-items: center; justify-content: center; padding: 1.5rem; backdrop-filter: blur(4px);">
-        <div style="background: #ffffff; border-radius: 12px; max-width: 900px; width: 100%; max-height: 90vh; overflow: auto; padding: 1.5rem; position: relative; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
-            <button onclick="closeGraphModalDirect()" style="position: absolute; top: 1rem; right: 1rem; background: #f1f5f9; border: none; font-size: 1.2rem; font-weight: bold; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; color: var(--text-secondary);">&times;</button>
+    <div id="graphModal" onclick="closeGraphModal(event)" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 1000; align-items: center; justify-content: center; padding: 1.5rem; backdrop-filter: blur(6px);">
+        <div style="background: #ffffff; border-radius: 14px; max-width: 940px; width: 100%; max-height: 90vh; overflow: auto; padding: 1.75rem; position: relative; box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25); border: 1px solid var(--border-color);">
+            <button onclick="closeGraphModalDirect()" style="position: absolute; top: 1.1rem; right: 1.1rem; background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 1.2rem; font-weight: bold; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; transition: all 0.15s ease;">&times;</button>
             <h3 id="modalGraphTitle" style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;"></h3>
-            <p id="modalGraphDesc" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;"></p>
-            <div style="text-align: center; background: #f8fafc; border-radius: 8px; padding: 1rem; border: 1px solid var(--border-color);">
+            <p id="modalGraphDesc" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.1rem;"></p>
+            <div style="text-align: center; background: #f8fafc; border-radius: 10px; padding: 1rem; border: 1px solid var(--border-color);">
                 <img id="modalGraphImg" src="" alt="Graph View" style="max-width: 100%; max-height: 65vh; object-fit: contain; border-radius: 6px;">
             </div>
         </div>
@@ -1500,16 +1632,16 @@ def root():
                     const badgeClass = g.category === 'Explainability (XAI)' ? 'badge-warning' : (g.category === 'EDA Inspection' ? 'badge-info' : 'badge-success');
                     const cleanDesc = g.description ? g.description.replace(/'/g, "\\'") : '';
                     html += `
-                        <div class="graph-card" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;" onclick="openGraphModal('${g.title}', '${cleanDesc}', '${g.url}')">
+                        <div class="graph-card" onclick="openGraphModal('${g.title}', '${cleanDesc}', '${g.url}')">
                             <div>
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                     <span class="badge ${badgeClass}">${g.category}</span>
-                                    <span style="font-size: 0.75rem; color: var(--text-muted);">🔍 Expand</span>
+                                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">🔍 Expand</span>
                                 </div>
                                 <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">${g.title}</h4>
                                 <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem; min-height: 2.4em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${g.description}</p>
                             </div>
-                            <div style="background: #f8fafc; border-radius: 6px; border: 1px solid var(--border-color); overflow: hidden; height: 220px; display: flex; align-items: center; justify-content: center; padding: 0.5rem;">
+                            <div style="background: #f8fafc; border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden; height: 220px; display: flex; align-items: center; justify-content: center; padding: 0.5rem;">
                                 <img src="${g.url}" alt="${g.title}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">
                             </div>
                         </div>
@@ -1581,14 +1713,14 @@ def root():
 
                     if (isRegression) {
                         grid.innerHTML = `
-                            <div class="metric-tile"><div class="metric-name">Predicted Value</div><div class="metric-val" style="color: #4f46e5;">${data.churn_label}</div></div>
+                            <div class="metric-tile"><div class="metric-name">Predicted Value</div><div class="metric-val" style="color: #2563eb;">${data.churn_label}</div></div>
                             <div class="metric-tile"><div class="metric-name">Actual Target Value</div><div class="metric-val">${actualVal}</div></div>
                             <div class="metric-tile"><div class="metric-name">Model Version</div><div class="metric-val">${data.model_version}</div></div>
                             <div class="metric-tile"><div class="metric-name">Inference Latency</div><div class="metric-val">${data.processing_time_ms} ms</div></div>
                         `;
                     } else {
                         grid.innerHTML = `
-                            <div class="metric-tile"><div class="metric-name">Predicted Label</div><div class="metric-val" style="color: #4f46e5;">${data.churn_label} (${data.churn_prediction})</div></div>
+                            <div class="metric-tile"><div class="metric-name">Predicted Label</div><div class="metric-val" style="color: #2563eb;">${data.churn_label} (${data.churn_prediction})</div></div>
                             <div class="metric-tile"><div class="metric-name">Confidence Probability</div><div class="metric-val">${(data.churn_probability * 100).toFixed(1)}%</div></div>
                             <div class="metric-tile"><div class="metric-name">Actual Label</div><div class="metric-val">${actualVal}</div></div>
                             <div class="metric-tile"><div class="metric-name">Inference Latency</div><div class="metric-val">${data.processing_time_ms} ms</div></div>
