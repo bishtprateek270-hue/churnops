@@ -31,6 +31,7 @@ from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import APIKeyHeader
+from fastapi.staticfiles import StaticFiles
 
 from api.schemas import BatchChurnInput, BatchChurnOutput, ChurnInput, ChurnOutput, HealthResponse
 from src.config import settings
@@ -328,6 +329,11 @@ if ENABLE_CORS:
         allow_headers=["*"],
     )
 
+# Mount reports directory for serving generated evaluation & EDA plots
+os.makedirs("reports/plots", exist_ok=True)
+os.makedirs("reports/eda", exist_ok=True)
+app.mount("/reports", StaticFiles(directory="reports"), name="reports")
+
 
 @app.post("/dataset/upload")
 async def upload_dataset_api(file: UploadFile = File(...)):  # noqa: B008
@@ -349,6 +355,14 @@ async def upload_dataset_api(file: UploadFile = File(...)):  # noqa: B008
             target_options = list(df.columns)
 
         preview_records = df.head(10).to_dict(orient="records")
+
+        # Generate EDA plots immediately upon CSV upload
+        try:
+            from src.eda_inspector import generate_eda_report
+
+            generate_eda_report(df, target_col=detected_target, output_dir="reports/eda")
+        except Exception as eda_err:
+            logger.warning(f"Notice: Upload EDA generation note: {eda_err}")
 
         return {
             "status": "success",
@@ -478,6 +492,80 @@ def get_dataset_preview():
         "target_options": target_options,
         "preview": df.head(10).to_dict(orient="records"),
     }
+
+
+@app.get("/dataset/graphs")
+def get_dataset_graphs():
+    """Return available dataset diagnostic plots and evaluation charts."""
+    graphs = []
+
+    plot_definitions = [
+        (
+            "confusion_matrix.png",
+            "reports/plots",
+            "Confusion Matrix",
+            "Model Evaluation",
+            "True vs Predicted classification decision matrix for holdout test set",
+        ),
+        (
+            "roc_curve.png",
+            "reports/plots",
+            "ROC Curve",
+            "Model Evaluation",
+            "Receiver Operating Characteristic (ROC) curve and Area Under Curve (AUC)",
+        ),
+        (
+            "pr_curve.png",
+            "reports/plots",
+            "Precision-Recall Curve",
+            "Model Evaluation",
+            "Precision vs Recall curve across decision thresholds",
+        ),
+        (
+            "calibration_curve.png",
+            "reports/plots",
+            "Probability Calibration",
+            "Model Reliability",
+            "Reliability diagram comparing predicted vs actual probabilities",
+        ),
+        (
+            "shap_summary.png",
+            "reports/plots",
+            "SHAP Feature Importance",
+            "Explainability (XAI)",
+            "SHAP summary chart depicting global feature contributions to predictions",
+        ),
+        (
+            "target_distribution.png",
+            "reports/eda",
+            "Target Variable Distribution",
+            "EDA Inspection",
+            "Class frequency distribution or value density of target column",
+        ),
+        (
+            "numerical_correlation_matrix.png",
+            "reports/eda",
+            "Feature Correlation Matrix",
+            "EDA Inspection",
+            "Pairwise Pearson correlation heatmap of numerical dataset features",
+        ),
+    ]
+
+    for filename, directory, title, category, description in plot_definitions:
+        filepath = os.path.join(directory, filename)
+        if os.path.exists(filepath):
+            mtime = int(os.path.getmtime(filepath))
+            url_path = f"/{directory}/{filename}?t={mtime}"
+            graphs.append({
+                "id": filename.replace(".", "_"),
+                "title": title,
+                "category": category,
+                "description": description,
+                "url": url_path,
+                "filename": filename,
+            })
+
+    return {"has_graphs": len(graphs) > 0, "count": len(graphs), "graphs": graphs}
 
 
 
@@ -907,11 +995,12 @@ def root():
 
     <main class="main-container">
         <nav class="tabs-nav">
-            <button class="tab-btn active" onclick="switchTab('tab-upload', event)">&#128194; 1. Dataset Upload & Train</button>
-            <button class="tab-btn" onclick="switchTab('tab-row', event)">&#127919; 2. Predict Dataset Row</button>
-            <button class="tab-btn" onclick="switchTab('tab-batch', event)">&#9889; 3. Batch CSV Inference</button>
-            <button class="tab-btn" onclick="switchTab('tab-custom', event)">&#128221; 4. Custom Single Form</button>
-            <button class="tab-btn" onclick="switchTab('tab-health', event)">&#128202; 5. Service Telemetry</button>
+            <button class="tab-btn active" onclick="switchTab('tab-upload', event)">📁 1. Dataset Upload & Train</button>
+            <button class="tab-btn" onclick="switchTab('tab-graphs', event)">📊 2. Diagnostic & EDA Graphs <span id="graphBadge" class="badge badge-warning" style="display:none; margin-left:0.3rem;">0</span></button>
+            <button class="tab-btn" onclick="switchTab('tab-row', event)">🎯 3. Predict Dataset Row</button>
+            <button class="tab-btn" onclick="switchTab('tab-batch', event)">⚡ 4. Batch CSV Inference</button>
+            <button class="tab-btn" onclick="switchTab('tab-custom', event)">📝 5. Custom Single Form</button>
+            <button class="tab-btn" onclick="switchTab('tab-health', event)">📈 6. Service Telemetry</button>
         </nav>
 
         <!-- TAB 1: UPLOAD & TRAIN -->
@@ -964,6 +1053,33 @@ def root():
                     <p class="card-desc" id="trainMetaSub">Model evaluation metrics on untouched holdout test set.</p>
                 </div>
                 <div class="metrics-grid" id="metricsGrid"></div>
+
+                <div id="inlineGraphsContainer" style="display: none; margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">📊 Evaluation & Interpretability Charts</h3>
+                        <button class="btn-link" onclick="switchTab('tab-graphs')">View Full Gallery →</button>
+                    </div>
+                    <div id="inlineGraphsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.25rem;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: DIAGNOSTIC & EDA GRAPHS -->
+        <div id="tab-graphs" class="tab-content">
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h2 class="card-title">Dataset & Model Diagnostic Graphs</h2>
+                        <p class="card-desc">Visual evaluation charts, EDA distributions, feature correlations, and SHAP explainability plots for the trained dataset.</p>
+                    </div>
+                    <button class="btn-link" onclick="loadDatasetGraphs()">🔄 Refresh Graphs</button>
+                </div>
+
+                <div id="graphsEmptyState" class="alert alert-warning" style="display: none; margin-top: 1rem;">
+                    ⚠️ <strong>No diagnostic graphs generated yet.</strong> Upload a CSV dataset and click <em>Train Leak-Free Model Suite</em> to generate EDA distributions, Confusion Matrices, ROC Curves, and SHAP explainability charts.
+                </div>
+
+                <div id="graphsGalleryGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; margin-top: 1.25rem;"></div>
             </div>
         </div>
 
@@ -1104,6 +1220,18 @@ def root():
         </div>
     </main>
 
+    <!-- Graph Modal Lightbox -->
+    <div id="graphModal" onclick="closeGraphModal(event)" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); z-index: 1000; align-items: center; justify-content: center; padding: 1.5rem; backdrop-filter: blur(4px);">
+        <div style="background: #ffffff; border-radius: 12px; max-width: 900px; width: 100%; max-height: 90vh; overflow: auto; padding: 1.5rem; position: relative; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);">
+            <button onclick="closeGraphModalDirect()" style="position: absolute; top: 1rem; right: 1rem; background: #f1f5f9; border: none; font-size: 1.2rem; font-weight: bold; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; color: var(--text-secondary);">&times;</button>
+            <h3 id="modalGraphTitle" style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;"></h3>
+            <p id="modalGraphDesc" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;"></p>
+            <div style="text-align: center; background: #f8fafc; border-radius: 8px; padding: 1rem; border: 1px solid var(--border-color);">
+                <img id="modalGraphImg" src="" alt="Graph View" style="max-width: 100%; max-height: 65vh; object-fit: contain; border-radius: 6px;">
+            </div>
+        </div>
+    </div>
+
     <script>
         let activeDataset = null;
         let batchResultsData = null;
@@ -1123,6 +1251,9 @@ def root():
             if (tabId === 'tab-row' && activeDataset) {
                 loadRowPreview();
             }
+            if (tabId === 'tab-graphs') {
+                loadDatasetGraphs();
+            }
             if (tabId === 'tab-health') {
                 loadHealthTelemetry();
             }
@@ -1138,6 +1269,7 @@ def root():
                     renderDatasetInfo(data);
                 }
             } catch(e) {}
+            loadDatasetGraphs();
         }
 
         function setupDragAndDrop() {
@@ -1199,6 +1331,7 @@ def root():
                     activeDataset = data;
                     document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-success">&#9989; Loaded ' + data.rows + ' rows, ' + data.num_columns + ' columns. Detected target: <strong>' + data.detected_target + '</strong></div>';
                     renderDatasetInfo(data);
+                    loadDatasetGraphs();
                 } else {
                     document.getElementById('uploadStatus').innerHTML = '<div class="alert alert-danger">&#10060; ' + (data.detail || 'Upload failed') + '</div>';
                 }
@@ -1332,7 +1465,79 @@ def root():
                 grid.innerHTML += '<div class="metric-tile"><div class="metric-name">' + k.replace(/_/g, ' ') + '</div><div class="metric-val">' + displayVal + '</div></div>';
             }
 
+            loadDatasetGraphs();
             card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        async function loadDatasetGraphs() {
+            try {
+                const res = await fetch('/dataset/graphs');
+                const data = await res.json();
+                const gallery = document.getElementById('graphsGalleryGrid');
+                const inlineGrid = document.getElementById('inlineGraphsGrid');
+                const inlineContainer = document.getElementById('inlineGraphsContainer');
+                const emptyState = document.getElementById('graphsEmptyState');
+                const badge = document.getElementById('graphBadge');
+
+                if (!data.has_graphs || !data.graphs || !data.graphs.length) {
+                    if (emptyState) emptyState.style.display = 'block';
+                    if (gallery) gallery.innerHTML = '';
+                    if (inlineGrid) inlineGrid.innerHTML = '';
+                    if (inlineContainer) inlineContainer.style.display = 'none';
+                    if (badge) badge.style.display = 'none';
+                    return;
+                }
+
+                if (emptyState) emptyState.style.display = 'none';
+                if (inlineContainer) inlineContainer.style.display = 'block';
+                if (badge) {
+                    badge.innerText = data.count;
+                    badge.style.display = 'inline-block';
+                }
+
+                let html = '';
+                data.graphs.forEach(g => {
+                    const badgeClass = g.category === 'Explainability (XAI)' ? 'badge-warning' : (g.category === 'EDA Inspection' ? 'badge-info' : 'badge-success');
+                    const cleanDesc = g.description ? g.description.replace(/'/g, "\\'") : '';
+                    html += `
+                        <div class="graph-card" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between;" onclick="openGraphModal('${g.title}', '${cleanDesc}', '${g.url}')">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span class="badge ${badgeClass}">${g.category}</span>
+                                    <span style="font-size: 0.75rem; color: var(--text-muted);">🔍 Expand</span>
+                                </div>
+                                <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">${g.title}</h4>
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem; min-height: 2.4em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${g.description}</p>
+                            </div>
+                            <div style="background: #f8fafc; border-radius: 6px; border: 1px solid var(--border-color); overflow: hidden; height: 220px; display: flex; align-items: center; justify-content: center; padding: 0.5rem;">
+                                <img src="${g.url}" alt="${g.title}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px;">
+                            </div>
+                        </div>
+                    `;
+                });
+
+                if (gallery) gallery.innerHTML = html;
+                if (inlineGrid) inlineGrid.innerHTML = html;
+            } catch(e) {
+                console.error('Error loading graphs:', e);
+            }
+        }
+
+        function openGraphModal(title, desc, url) {
+            document.getElementById('modalGraphTitle').innerText = title;
+            document.getElementById('modalGraphDesc').innerText = desc;
+            document.getElementById('modalGraphImg').src = url;
+            document.getElementById('graphModal').style.display = 'flex';
+        }
+
+        function closeGraphModal(e) {
+            if (e.target && e.target.id === 'graphModal') {
+                document.getElementById('graphModal').style.display = 'none';
+            }
+        }
+
+        function closeGraphModalDirect() {
+            document.getElementById('graphModal').style.display = 'none';
         }
 
         function loadRowPreview() {

@@ -107,3 +107,14 @@ def test_predict_endpoint_malformed_input():
 
     response = client.post("/predict", json=payload)
     assert response.status_code == 422
+
+
+def test_dataset_graphs_endpoint():
+    """Test /dataset/graphs GET endpoint."""
+    response = client.get("/dataset/graphs")
+    assert response.status_code == 200
+    data = response.json()
+    assert "graphs" in data
+    assert "count" in data
+    assert isinstance(data["graphs"], list)
+
