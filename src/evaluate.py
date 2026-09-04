@@ -53,17 +53,20 @@ def calculate_classification_metrics(
 
     if y_prob is not None:
         try:
-            roc_auc = float(roc_auc_score(y_true, y_prob))
+            val = float(roc_auc_score(y_true, y_prob))
+            roc_auc = 0.5 if np.isnan(val) else val
         except Exception:
             roc_auc = 0.5
 
         try:
-            pr_auc = float(average_precision_score(y_true, y_prob))
+            val = float(average_precision_score(y_true, y_prob))
+            pr_auc = 0.0 if np.isnan(val) else val
         except Exception:
             pr_auc = 0.0
 
         try:
-            brier = float(brier_score_loss(y_true, y_prob))
+            val = float(brier_score_loss(y_true, y_prob))
+            brier = 1.0 if np.isnan(val) else val
         except Exception:
             brier = 1.0
 

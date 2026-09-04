@@ -19,12 +19,10 @@ def test_evaluation_metrics_mathematical_consistency():
     assert test_metrics is not None
 
     # Check valid metric ranges
-    assert 0.0 <= test_metrics["accuracy"] <= 1.0
-    assert 0.0 <= test_metrics["precision"] <= 1.0
-    assert 0.0 <= test_metrics["recall"] <= 1.0
-    assert 0.0 <= test_metrics["f1_score"] <= 1.0
-    assert 0.0 <= test_metrics["roc_auc"] <= 1.0
-    assert 0.0 <= test_metrics["pr_auc"] <= 1.0
+    for metric_name in ["accuracy", "precision", "recall", "f1_score", "roc_auc", "pr_auc"]:
+        val = test_metrics[metric_name]
+        assert not np.isnan(val), f"Metric {metric_name} is NaN"
+        assert 0.0 <= val <= 1.0, f"Metric {metric_name} out of bounds: {val}"
 
 
 def test_confusion_matrix_direct_calculation():
